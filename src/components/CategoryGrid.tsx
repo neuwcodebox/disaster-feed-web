@@ -19,7 +19,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
           <h2 className="text-xl font-bold text-slate-300">종류별 상황판</h2>
         </div>
         <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
-          최근 활성 종류 우선 정렬
+          최신순
         </div>
       </div>
 
