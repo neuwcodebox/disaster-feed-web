@@ -53,7 +53,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses }) => {
                   }`}
                 />
                 <span
-                  className={`text-[8px] md:text-[10px] font-bold leading-tight whitespace-pre-line text-center ${source.isConnected ? 'text-slate-400' : 'text-red-400'}`}
+                  className={`hidden sm:block text-[8px] md:text-[10px] font-bold leading-tight whitespace-pre-line text-center ${source.isConnected ? 'text-slate-400' : 'text-red-400'}`}
                 >
                   {source.name}
                 </span>
