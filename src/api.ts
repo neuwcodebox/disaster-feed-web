@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EVENT_KIND_LABELS, EVENT_SOURCE_LABELS, SOURCE_DISPLAY_ORDER } from './constants';
+import { EVENT_KIND_LABELS, EVENT_SOURCE_LABELS, SOURCE_DISPLAY_ORDER, STATUS_SOURCE_LABELS } from './constants';
 import { type DisasterEvent, EventKinds, EventLevels, EventSources, type SourceStatus } from './types';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
@@ -69,6 +69,11 @@ const getSourceLabel = (sourceId: number, sourceKey?: string): string => {
   return label ?? sourceKey ?? `#${sourceId}`;
 };
 
+const getStatusSourceLabel = (sourceId: number, sourceKey?: string): string => {
+  const label = STATUS_SOURCE_LABELS[sourceId as EventSources];
+  return label ?? sourceKey ?? `#${sourceId}`;
+};
+
 const getKindLabel = (kind: number): string => {
   const label = EVENT_KIND_LABELS[kind as EventKinds];
   return label ?? '기타';
@@ -98,7 +103,7 @@ export const fetchSourceStatuses = async (): Promise<SourceStatus[]> => {
     const isConnected = source.status === 'ok' && !!lastSuccessMs && !isStale;
     mapped.push({
       sourceId: source.sourceId,
-      name: getSourceLabel(source.sourceId, source.sourceKey),
+      name: getStatusSourceLabel(source.sourceId, source.sourceKey),
       isConnected,
       lastUpdate: lastSuccessMs ?? generatedAtMs,
     });
