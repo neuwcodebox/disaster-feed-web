@@ -25,7 +25,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses }) => {
         </div>
         <div>
           <h1 className="text-3xl font-extrabold tracking-tighter text-white">
-            재난 상황 <span className="text-red-500">실시간</span> 모니터링
+            <span className="text-red-500">실시간</span> 재난 통합 상황판
           </h1>
           <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">
             Disaster Integrated Live Dashboard
