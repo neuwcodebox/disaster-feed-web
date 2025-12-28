@@ -1,4 +1,5 @@
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ShieldAlert } from 'lucide-react';
 import type React from 'react';
@@ -8,6 +9,12 @@ import { type DisasterEvent, EventLevels } from '../types';
 interface SidebarProps {
   events: DisasterEvent[];
 }
+
+const formatRelativeTime = (timestamp: number) =>
+  formatDistanceToNow(timestamp, {
+    addSuffix: true,
+    locale: ko,
+  });
 
 const Sidebar: React.FC<SidebarProps> = ({ events }) => {
   return (
@@ -35,9 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                   >
                     {LEVEL_CONFIG[event.level].label}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500 font-bold">
-                    {format(event.timestamp, 'HH:mm:ss')}
-                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold">{formatRelativeTime(event.timestamp)}</span>
                 </div>
 
                 <h3 className="font-bold text-sm text-slate-100 line-clamp-2 leading-snug mb-2">{event.title}</h3>

@@ -1,4 +1,5 @@
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LayoutGrid } from 'lucide-react';
 import type React from 'react';
@@ -8,6 +9,12 @@ import type { CategoryGroup } from '../types';
 interface CategoryGridProps {
   groups: CategoryGroup[];
 }
+
+const formatRelativeTime = (timestamp: number) =>
+  formatDistanceToNow(timestamp, {
+    addSuffix: true,
+    locale: ko,
+  });
 
 const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
   return (
@@ -79,8 +86,8 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                                 >
                                   {LEVEL_CONFIG[event.level].label}
                                 </span>
-                                <span className="text-[9px] font-mono font-bold text-slate-500">
-                                  {format(event.timestamp, 'HH:mm:ss')}
+                                <span className="text-[9px] font-bold text-slate-500">
+                                  {formatRelativeTime(event.timestamp)}
                                 </span>
                               </div>
                               <h4
