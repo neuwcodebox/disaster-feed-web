@@ -218,7 +218,7 @@ const App: React.FC = () => {
   }, [events]);
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-950 text-slate-50 border-[12px] border-slate-900 select-none">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-950 text-slate-50 border-[2px] border-slate-900 select-none">
       <Header sourceStatuses={sourceStatuses} />
 
       <main className="flex-1 flex overflow-hidden">
