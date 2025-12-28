@@ -41,6 +41,11 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                 </div>
 
                 <h3 className="font-bold text-sm text-slate-100 line-clamp-2 leading-snug mb-2">{event.title}</h3>
+                {event.content && (
+                  <p className="text-[11px] text-slate-300 whitespace-pre-line break-words leading-snug">
+                    {event.content}
+                  </p>
+                )}
 
                 <div className="flex items-center justify-between mt-auto">
                   <span className="text-[10px] font-semibold text-slate-400">

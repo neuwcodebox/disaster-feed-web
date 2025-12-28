@@ -87,7 +87,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                               {event.title}
                             </h4>
                             {idx === 0 && event.content && (
-                              <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5 font-medium leading-none">
+                              <p className="text-[10px] text-slate-500 mt-0.5 font-medium leading-tight whitespace-pre-line break-words">
                                 {event.content}
                               </p>
                             )}
