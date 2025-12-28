@@ -18,7 +18,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses }) => {
   }, []);
 
   return (
-    <header className="h-20 bg-slate-900 flex items-center justify-between px-8 border-b border-slate-800 shadow-2xl relative z-10 shrink-0">
+    <header className="h-20 bg-slate-900 flex items-center justify-between px-4 border-b border-slate-800 shadow-2xl relative z-10 shrink-0">
       <div className="flex items-center space-x-4">
         <div className="bg-red-600 p-2 rounded-lg animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.4)]">
           <Activity className="w-8 h-8 text-white" />
