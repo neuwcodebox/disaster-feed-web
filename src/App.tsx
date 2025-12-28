@@ -12,7 +12,7 @@ import CategoryGrid from './components/CategoryGrid';
 import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
-import { EVENT_SOURCE_LABELS, MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL, SOURCE_DISPLAY_ORDER } from './constants';
+import { MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL, SOURCE_DISPLAY_ORDER, STATUS_SOURCE_LABELS } from './constants';
 import { type CategoryGroup, type DisasterEvent, EventLevels, type SourceStatus } from './types';
 
 const createInitialSourceStatuses = (): SourceStatus[] => {
@@ -21,7 +21,7 @@ const createInitialSourceStatuses = (): SourceStatus[] => {
     const sourceId = SOURCE_DISPLAY_ORDER[i];
     initial.push({
       sourceId,
-      name: EVENT_SOURCE_LABELS[sourceId] ?? `#${sourceId}`,
+      name: STATUS_SOURCE_LABELS[sourceId] ?? `#${sourceId}`,
       isConnected: false,
       lastUpdate: 0,
     });

@@ -77,7 +77,7 @@ export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.O3]: '오존',
 };
 
-export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
+export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.SafekoreaSms]: '행안부\n(문자)',
   [EventSources.KmaMicroEarthquake]: '기상청\n(미소)',
   [EventSources.KmaPewsEarthquake]: '기상청\n(지진)',
@@ -87,6 +87,18 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.AirkoreaPmWarning]: '환경부\n(PM)',
   [EventSources.AirkoreaO3Warning]: '환경부\n(O3)',
   [EventSources.ForestFireInfo]: '산림청\n(산불)',
+};
+
+export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
+  [EventSources.SafekoreaSms]: '행안부',
+  [EventSources.KmaMicroEarthquake]: '기상청',
+  [EventSources.KmaPewsEarthquake]: '기상청',
+  [EventSources.NfdsFireDispatch]: '소방청',
+  [EventSources.KmaWeatherWarning]: '기상청',
+  [EventSources.UticTrafficIncident]: '경찰청',
+  [EventSources.AirkoreaPmWarning]: '환경부',
+  [EventSources.AirkoreaO3Warning]: '환경부',
+  [EventSources.ForestFireInfo]: '산림청',
 };
 
 export const SOURCE_DISPLAY_ORDER: EventSources[] = [
