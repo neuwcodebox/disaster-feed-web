@@ -77,6 +77,10 @@ export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.O3]: '오존',
 };
 
+export const EVENT_KIND_VALUES: EventKinds[] = Object.values(EventKinds).filter(
+  (value): value is EventKinds => typeof value === 'number',
+);
+
 export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.SafekoreaSms]: '행안부\n(문자)',
   [EventSources.KmaMicroEarthquake]: '기상청\n(미소)',

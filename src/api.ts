@@ -120,10 +120,24 @@ export const fetchSourceStatuses = async (): Promise<SourceStatus[]> => {
   return mapped;
 };
 
-export const fetchInitialEvents = async (): Promise<ApiEvent[]> => {
-  const response = await fetch(buildApiUrl('/api/events'));
+export const fetchInitialEvents = async (limit = 10): Promise<ApiEvent[]> => {
+  const url = new URL(buildApiUrl('/api/events'));
+  url.searchParams.set('limit', limit.toString());
+  const response = await fetch(url.toString());
   if (!response.ok) {
     throw new Error(`Failed to fetch initial events: ${response.status}`);
+  }
+  const payload = z.array(schemaEvent).parse(await response.json());
+  return payload;
+};
+
+export const fetchEventsByKind = async (kind: number, limit = 10): Promise<ApiEvent[]> => {
+  const url = new URL(buildApiUrl('/api/events'));
+  url.searchParams.set('kind', kind.toString());
+  url.searchParams.set('limit', limit.toString());
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`Failed to fetch events by kind ${kind}: ${response.status}`);
   }
   const payload = z.array(schemaEvent).parse(await response.json());
   return payload;

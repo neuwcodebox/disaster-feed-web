@@ -1,7 +1,9 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  type ApiEvent,
   createEventSource,
+  fetchEventsByKind,
   fetchInitialEvents,
   fetchSourceStatuses,
   getFetchedAtMs,
@@ -12,7 +14,13 @@ import CategoryGrid from './components/CategoryGrid';
 import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
-import { MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL, SOURCE_DISPLAY_ORDER, STATUS_SOURCE_LABELS } from './constants';
+import {
+  EVENT_KIND_VALUES,
+  MAX_CATEGORIES_DISPLAY,
+  SIDEBAR_MIN_LEVEL,
+  SOURCE_DISPLAY_ORDER,
+  STATUS_SOURCE_LABELS,
+} from './constants';
 import { type CategoryGroup, type DisasterEvent, EventLevels, type SourceStatus } from './types';
 
 const createInitialSourceStatuses = (): SourceStatus[] => {
@@ -84,20 +92,43 @@ const App: React.FC = () => {
 
     const loadInitialEvents = async () => {
       try {
-        const payload = await fetchInitialEvents();
+        const allEventsPromise = fetchInitialEvents();
+        const kindPromises: Promise<ApiEvent[]>[] = [];
+        for (let i = 0; i < EVENT_KIND_VALUES.length; i += 1) {
+          kindPromises.push(fetchEventsByKind(EVENT_KIND_VALUES[i], 10));
+        }
+        const [allEvents, kindResults] = await Promise.all([allEventsPromise, Promise.allSettled(kindPromises)]);
         if (!isActive) {
           return;
         }
-        const mapped: DisasterEvent[] = [];
+        const combined: ApiEvent[] = [];
+        for (let i = 0; i < allEvents.length; i += 1) {
+          combined.push(allEvents[i]);
+        }
+        for (let i = 0; i < kindResults.length; i += 1) {
+          const result = kindResults[i];
+          if (result.status === 'fulfilled') {
+            for (let j = 0; j < result.value.length; j += 1) {
+              combined.push(result.value[j]);
+            }
+          } else {
+            console.warn('Failed to fetch events by kind', result.reason);
+          }
+        }
+        const mappedById = new Map<string, DisasterEvent>();
         let latestFetchedAt: number | null = lastFetchedAtRef.current;
-        for (let i = 0; i < payload.length; i += 1) {
-          const mappedEvent = toDisasterEvent(payload[i]);
-          mapped.push(mappedEvent);
-          const fetchedAtMs = getFetchedAtMs(payload[i]);
+        for (let i = 0; i < combined.length; i += 1) {
+          const mappedEvent = toDisasterEvent(combined[i]);
+          const existing = mappedById.get(mappedEvent.id);
+          if (!existing || mappedEvent.timestamp > existing.timestamp) {
+            mappedById.set(mappedEvent.id, mappedEvent);
+          }
+          const fetchedAtMs = getFetchedAtMs(combined[i]);
           if (fetchedAtMs && (latestFetchedAt === null || fetchedAtMs > latestFetchedAt)) {
             latestFetchedAt = fetchedAtMs;
           }
         }
+        const mapped = Array.from(mappedById.values());
         mapped.sort((a, b) => b.timestamp - a.timestamp);
         setEvents(mapped.slice(0, 100));
         if (latestFetchedAt) {
