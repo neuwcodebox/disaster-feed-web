@@ -47,7 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                   </p>
                 )}
 
-                <div className="flex items-center justify-between mt-auto">
+                <div className="flex items-center justify-between mt-2">
                   <span className="text-[10px] font-semibold text-slate-400">
                     {event.source} | {event.category}
                   </span>
