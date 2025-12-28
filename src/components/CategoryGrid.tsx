@@ -3,7 +3,7 @@ import { ko } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LayoutGrid } from 'lucide-react';
 import type React from 'react';
-import { LEVEL_CONFIG } from '../constants';
+import { getEventKindIcon, LEVEL_CONFIG } from '../constants';
 import { type CategoryGroup, EventLevels } from '../types';
 
 interface CategoryGridProps {
@@ -73,6 +73,9 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                     />
                     <h3 className="text-base md:text-lg font-bold text-white tracking-tight">{group.category}</h3>
                   </div>
+                  <span className="text-sm md:text-base leading-none" aria-hidden="true">
+                    {getEventKindIcon(group.latestEvent.kind)}
+                  </span>
                 </div>
 
                 {/* Event List */}

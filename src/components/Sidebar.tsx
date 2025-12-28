@@ -3,7 +3,7 @@ import { ko } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ShieldAlert } from 'lucide-react';
 import type React from 'react';
-import { LEVEL_CONFIG } from '../constants';
+import { getEventKindIcon, LEVEL_CONFIG } from '../constants';
 import { type DisasterEvent, EventLevels } from '../types';
 
 interface SidebarProps {
@@ -48,8 +48,11 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                   </span>
                 </div>
 
-                <h3 className="font-bold text-xs md:text-sm text-slate-100 leading-snug mb-1.5 md:mb-2 whitespace-pre-line break-all">
-                  {event.title}
+                <h3 className="font-bold text-xs md:text-sm text-slate-100 leading-snug mb-1.5 md:mb-2 whitespace-pre-line break-all flex items-center gap-1">
+                  <span className="text-[12px] md:text-[14px] leading-none" aria-hidden="true">
+                    {getEventKindIcon(event.kind)}
+                  </span>
+                  <span className="min-w-0">{event.title}</span>
                 </h3>
                 {event.content && (
                   <p className="text-[11px] md:text-[12px] text-slate-300 leading-snug whitespace-pre-line wrap-break-words">

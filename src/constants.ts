@@ -77,6 +77,47 @@ export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.O3]: '오존',
 };
 
+export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
+  [EventKinds.Other]: '❔',
+  [EventKinds.Quake]: '🌎',
+  [EventKinds.Ai]: '🐦',
+  [EventKinds.Drought]: '🏜️',
+  [EventKinds.Livestock]: '🐮',
+  [EventKinds.Wind]: '💨',
+  [EventKinds.Dry]: '☀️',
+  [EventKinds.Transport]: '🚌',
+  [EventKinds.TrafficCrash]: '💥',
+  [EventKinds.TrafficCtrl]: '🚧',
+  [EventKinds.Finance]: '💹',
+  [EventKinds.Snow]: '❄️',
+  [EventKinds.FineDust]: '🌫️',
+  [EventKinds.CivDef]: '🛡️',
+  [EventKinds.Collapse]: '🏚️',
+  [EventKinds.Wildfire]: '🌲',
+  [EventKinds.Landslide]: '⛰️',
+  [EventKinds.Water]: '🚰',
+  [EventKinds.Fog]: '🌁',
+  [EventKinds.Energy]: '⚡',
+  [EventKinds.Epidemic]: '🦠',
+  [EventKinds.Blackout]: '💡',
+  [EventKinds.Tsunami]: '🌊',
+  [EventKinds.Typhoon]: '🌀',
+  [EventKinds.Terror]: '💣',
+  [EventKinds.Telecom]: '📡',
+  [EventKinds.Explosion]: '🧨',
+  [EventKinds.Heat]: '🥵',
+  [EventKinds.HighSeas]: '⛵',
+  [EventKinds.Cold]: '🥶',
+  [EventKinds.Rain]: '🌧️',
+  [EventKinds.Flood]: '🌊',
+  [EventKinds.Fire]: '🔥',
+  [EventKinds.Pollution]: '🏭',
+  [EventKinds.YellowDust]: '🟡',
+  [EventKinds.O3]: '🧪',
+};
+
+export const getEventKindIcon = (kind: number): string => EVENT_KIND_ICONS[kind as EventKinds] ?? '?';
+
 export const EVENT_KIND_VALUES: EventKinds[] = Object.values(EventKinds).filter(
   (value): value is EventKinds => typeof value === 'number',
 );
