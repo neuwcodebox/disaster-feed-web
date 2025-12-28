@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Clock, LayoutGrid } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 import type React from 'react';
 import { LEVEL_CONFIG } from '../constants';
 import type { CategoryGroup } from '../types';
@@ -51,10 +51,6 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                       className={`w-2.5 h-2.5 rounded-full ${LEVEL_CONFIG[highestLevel].bg} shadow-sm animate-pulse`}
                     />
                     <h3 className="text-lg font-bold text-white tracking-tight">{group.category}</h3>
-                  </div>
-                  <div className="flex items-center text-[10px] font-bold text-slate-400">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {format(group.latestEvent.timestamp, 'HH:mm')}
                   </div>
                 </div>
 
