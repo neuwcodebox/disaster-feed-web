@@ -265,18 +265,20 @@ const App: React.FC = () => {
   }, [events]);
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-950 text-slate-50 border-[2px] border-slate-900 select-none">
+    // On mobile, we use min-h-screen and allow overflow. On desktop, fixed h-screen.
+    <div className="min-h-screen lg:h-screen w-full flex flex-col bg-slate-950 text-slate-50 border-0 md:border-[2px] border-slate-900 select-none overflow-x-hidden">
       <Header sourceStatuses={sourceStatuses} />
 
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar: Recent Critical/Severe Events */}
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Sidebar: Above grid on mobile, Left side on desktop */}
         <Sidebar events={sidebarEvents} />
 
-        {/* Right Main Grid: Category-wise latest events with fixed layout */}
-        <CategoryGrid groups={categoryGroups} />
+        {/* Main Grid: Scrollable area */}
+        <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col">
+          <CategoryGrid groups={categoryGroups} />
+        </div>
       </main>
 
-      {/* Ticker footer for additional broadcast feel */}
       <FooterMarquee events={events.slice(0, 10)} />
     </div>
   );

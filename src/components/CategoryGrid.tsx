@@ -20,31 +20,33 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
   const levels = [EventLevels.Info, EventLevels.Minor, EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
 
   return (
-    <div className="flex-1 bg-slate-950 p-6 flex flex-col overflow-hidden">
+    <div className="flex-1 bg-slate-950 p-4 md:p-6 flex flex-col lg:overflow-hidden">
       {/* Grid Header */}
-      <div className="flex items-center justify-between mb-4 ml-2 shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3 shrink-0">
         <div className="flex items-center space-x-2">
-          <LayoutGrid className="w-5 h-5 text-blue-500" />
-          <h2 className="text-xl font-bold text-slate-300">유형별 현황</h2>
+          <LayoutGrid className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
+          <h2 className="text-lg md:text-xl font-bold text-slate-300">유형별 현황</h2>
         </div>
-        <div className="flex items-center space-x-3">
-          {/* Legend Section */}
-          <div className="flex items-center space-x-3 bg-slate-900/30 px-3 py-1.5 rounded-lg border border-slate-800/50">
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Legend Section - Wrap on very small screens */}
+          <div className="flex items-center space-x-2 md:space-x-3 bg-slate-900/30 px-2 md:px-3 py-1.5 rounded-lg border border-slate-800/50 overflow-x-auto max-w-full">
             {levels.map((level) => (
-              <div key={level} className="flex items-center space-x-1.5">
-                <div className={`w-2 h-2 rounded-full ${LEVEL_CONFIG[level].bg}`} />
-                <span className="text-[11px] font-bold text-slate-400">{LEVEL_CONFIG[level].label}</span>
+              <div key={level} className="flex items-center space-x-1 whitespace-nowrap">
+                <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${LEVEL_CONFIG[level].bg}`} />
+                <span className="text-[9px] md:text-[10px] font-bold text-slate-400">{LEVEL_CONFIG[level].label}</span>
               </div>
             ))}
           </div>
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
+
+          <div className="hidden sm:block text-[8px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800">
             최신순
           </div>
         </div>
       </div>
 
-      {/* Fixed Grid Container: ensures no scrollbars appear on the main page */}
-      <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-hidden">
+      {/* Responsive Grid Container: 1 col on mobile, 2 on tablet, 3 on desktop */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:overflow-hidden">
         <AnimatePresence mode="popLayout">
           {groups.map((group) => {
             let highestLevel = group.latestEvent.level;
@@ -61,31 +63,30 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 120 }}
-                className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-lg h-full"
+                className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-lg h-auto lg:h-full min-h-[160px]"
               >
                 {/* Category Header - Fixed Height */}
-                <div className="h-12 px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-800/30 shrink-0">
+                <div className="h-10 md:h-12 px-3 md:px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-800/30 shrink-0">
                   <div className="flex items-center space-x-2">
                     <div
-                      className={`w-2.5 h-2.5 rounded-full ${LEVEL_CONFIG[highestLevel].bg} shadow-sm animate-pulse`}
+                      className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full ${LEVEL_CONFIG[highestLevel].bg} shadow-sm animate-pulse`}
                     />
-                    <h3 className="text-lg font-bold text-white tracking-tight">{group.category}</h3>
+                    <h3 className="text-base md:text-lg font-bold text-white tracking-tight">{group.category}</h3>
                   </div>
                 </div>
 
-                {/* Event List - Fill remaining space within category block */}
-                <div className="flex-1 overflow-hidden relative">
-                  <div className="absolute inset-0 p-2 space-y-1 overflow-hidden">
+                {/* Event List */}
+                <div className="flex-1 lg:overflow-hidden relative p-2">
+                  <div className="lg:absolute lg:inset-0 p-2 space-y-1 overflow-hidden">
                     <AnimatePresence mode="popLayout">
                       {group.events.slice(0, 20).map((event, idx) => (
                         <motion.div
                           key={event.id}
                           layout
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`p-2.5 rounded-lg border border-transparent transition-colors ${
-                            idx === 0 ? 'bg-slate-800/60 border-slate-700/50 shadow-inner' : 'bg-transparent'
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className={`p-2 rounded-lg transition-colors ${
+                            idx === 0 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-transparent'
                           }`}
                         >
                           <div className="flex items-start space-x-2">
@@ -95,16 +96,16 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between mb-0.5">
                                 <span
-                                  className={`text-[8px] font-black px-1 rounded-sm uppercase ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}
+                                  className={`text-[7px] md:text-[8px] font-black px-1 rounded-sm uppercase ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}
                                 >
                                   {LEVEL_CONFIG[event.level].label}
                                 </span>
-                                <span className="text-[9px] font-bold text-slate-500">
+                                <span className="text-[8px] md:text-[9px] font-bold text-slate-500">
                                   {formatRelativeTime(event.timestamp)}
                                 </span>
                               </div>
                               <h4
-                                className={`text-[13px] font-bold leading-tight whitespace-normal break-all ${
+                                className={`text-xs md:text-[13px] font-bold leading-tight truncate ${
                                   idx === 0 ? 'text-slate-100' : 'text-slate-400'
                                 }`}
                               >
@@ -126,7 +127,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                 {/* Intensity Bar - Fixed Height */}
                 <div className="h-1 w-full flex shrink-0">
                   {group.events.slice(0, 12).map((e) => (
-                    <div key={`intensity-${e.id}`} className={`flex-1 h-full ${LEVEL_CONFIG[e.level].bg} opacity-30`} />
+                    <div key={`intensity-${e.id}`} className={`flex-1 h-full ${LEVEL_CONFIG[e.level].bg} opacity-20`} />
                   ))}
                 </div>
               </motion.div>
