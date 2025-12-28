@@ -15,21 +15,21 @@ const FooterMarquee: React.FC<FooterMarqueeProps> = ({ events }) => {
 
       <div className="flex-1 flex items-center overflow-hidden whitespace-nowrap">
         <div className="animate-marquee inline-block py-1">
-          {events.map((event, idx) => (
-            <span key={event.id} className="mx-8 text-sm font-bold text-slate-300">
+          {events.map((event) => (
+            <span key={event.id} className="text-sm font-bold text-slate-300">
               <span className="text-blue-400 mr-2">[{format(event.timestamp, 'HH:mm')}]</span>
               <span className="text-white mr-1">{event.source}:</span>
               {event.title}
-              {idx !== events.length - 1 && <span className="mx-8 text-slate-700">|</span>}
+              <span className="mx-8 text-slate-700">|</span>
             </span>
           ))}
           {/* Repeat for seamless loop if needed, but for broadcast, a standard long list is fine */}
-          {events.map((event, idx) => (
-            <span key={`${event.id}-copy`} className="mx-8 text-sm font-bold text-slate-300">
+          {events.map((event) => (
+            <span key={`${event.id}-copy`} className="text-sm font-bold text-slate-300">
               <span className="text-blue-400 mr-2">[{format(event.timestamp, 'HH:mm')}]</span>
               <span className="text-white mr-1">{event.source}:</span>
               {event.title}
-              {idx !== events.length - 1 && <span className="mx-8 text-slate-700">|</span>}
+              <span className="mx-8 text-slate-700">|</span>
             </span>
           ))}
         </div>
