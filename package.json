@@ -12,11 +12,13 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "tailwindcss": "^4.1.18",
     "zod": "^4.2.1"
   },
   "devDependencies": {

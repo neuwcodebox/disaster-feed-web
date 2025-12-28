@@ -63,7 +63,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-lg h-[280px] md:h-[320px] lg:h-full"
+                className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-lg h-70 md:h-80 lg:h-full"
               >
                 {/* Category Header - Fixed Height */}
                 <div className="h-10 md:h-12 px-3 md:px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-800/30 shrink-0">
@@ -117,7 +117,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                                 <p
                                   className={
                                     idx === 0
-                                      ? 'text-[10px] text-slate-500 mt-0.5 font-medium leading-tight whitespace-pre-line break-words'
+                                      ? 'text-[10px] text-slate-500 mt-0.5 font-medium leading-tight whitespace-pre-line wrap-break-word'
                                       : 'text-[10px] text-slate-500 mt-0.5 font-medium leading-tight truncate'
                                   }
                                 >

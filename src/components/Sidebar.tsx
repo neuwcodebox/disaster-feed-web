@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className={`flex-shrink-0 w-64 lg:w-full p-3 md:p-4 rounded-xl border-l-4 md:border-l-8 ${LEVEL_CONFIG[event.level].border} bg-slate-800 shadow-lg relative overflow-hidden`}
+                className={`shrink-0 w-64 lg:w-full p-3 md:p-4 rounded-xl border-l-4 md:border-l-8 ${LEVEL_CONFIG[event.level].border} bg-slate-800 shadow-lg relative overflow-hidden`}
               >
                 <div className="flex justify-between items-start mb-1.5 md:mb-2">
                   <span
@@ -52,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                   {event.title}
                 </h3>
                 {event.content && (
-                  <p className="text-[11px] md:text-[12px] text-slate-300 leading-snug whitespace-pre-line break-words">
+                  <p className="text-[11px] md:text-[12px] text-slate-300 leading-snug whitespace-pre-line wrap-break-words">
                     {event.content}
                   </p>
                 )}

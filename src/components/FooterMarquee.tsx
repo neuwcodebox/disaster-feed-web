@@ -10,7 +10,7 @@ const FooterMarquee: React.FC<FooterMarqueeProps> = ({ events }) => {
   return (
     <footer className="h-12 bg-slate-900 border-t border-slate-800 flex items-center overflow-hidden relative">
       <div className="bg-red-600 px-6 h-full flex items-center z-10 skew-x-[-20deg] -ml-4">
-        <span className="text-sm font-black text-white italic tracking-tighter skew-x-[20deg]">LIVE UPDATE</span>
+        <span className="text-sm font-black text-white italic tracking-tighter skew-x-20">LIVE UPDATE</span>
       </div>
 
       <div className="flex-1 flex items-center overflow-hidden whitespace-nowrap">
