@@ -80,7 +80,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                               </span>
                             </div>
                             <h4
-                              className={`text-[13px] font-bold leading-tight truncate ${
+                              className={`text-[13px] font-bold leading-tight whitespace-normal break-all ${
                                 idx === 0 ? 'text-slate-100' : 'text-slate-400'
                               }`}
                             >
