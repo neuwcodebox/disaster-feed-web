@@ -46,7 +46,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
       </div>
 
       {/* Responsive Grid Container: 1 col on mobile, 2 on tablet, 3 on desktop */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:overflow-hidden pb-4 md:pb-0">
         <AnimatePresence mode="popLayout">
           {groups.map((group) => {
             let highestLevel = group.latestEvent.level;
@@ -63,7 +63,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-lg h-auto lg:h-full min-h-[160px]"
+                className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-lg h-[280px] md:h-[320px] lg:h-full"
               >
                 {/* Category Header - Fixed Height */}
                 <div className="h-10 md:h-12 px-3 md:px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-800/30 shrink-0">
@@ -76,17 +76,19 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                 </div>
 
                 {/* Event List */}
-                <div className="flex-1 lg:overflow-hidden relative p-2">
-                  <div className="lg:absolute lg:inset-0 p-2 space-y-1 overflow-hidden">
+                <div className="flex-1 relative overflow-hidden group/list">
+                  <div className="absolute inset-0 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
                     <AnimatePresence mode="popLayout">
                       {group.events.slice(0, 20).map((event, idx) => (
                         <motion.div
                           key={event.id}
                           layout
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className={`p-2 rounded-lg transition-colors ${
-                            idx === 0 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-transparent'
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`p-2 rounded-lg transition-all duration-300 border ${
+                            idx === 0
+                              ? 'bg-slate-800/80 border-slate-600/50 shadow-md ring-1 ring-slate-700/30'
+                              : 'bg-slate-900/40 border-transparent hover:bg-slate-800/40 hover:border-slate-700/30'
                           }`}
                         >
                           <div className="flex items-start space-x-2">
