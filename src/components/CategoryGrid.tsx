@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { LayoutGrid } from 'lucide-react';
 import type React from 'react';
 import { LEVEL_CONFIG } from '../constants';
-import type { CategoryGroup } from '../types';
+import { type CategoryGroup, EventLevels } from '../types';
 
 interface CategoryGridProps {
   groups: CategoryGroup[];
@@ -17,6 +17,8 @@ const formatRelativeTime = (timestamp: number) =>
   });
 
 const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
+  const levels = [EventLevels.Info, EventLevels.Minor, EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
+
   return (
     <div className="flex-1 bg-slate-950 p-6 flex flex-col overflow-hidden">
       {/* Grid Header */}
@@ -25,8 +27,19 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
           <LayoutGrid className="w-5 h-5 text-blue-500" />
           <h2 className="text-xl font-bold text-slate-300">유형별 현황</h2>
         </div>
-        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
-          최신순
+        <div className="flex items-center space-x-3">
+          {/* Legend Section */}
+          <div className="flex items-center space-x-3 bg-slate-900/30 px-3 py-1.5 rounded-lg border border-slate-800/50">
+            {levels.map((level) => (
+              <div key={level} className="flex items-center space-x-1.5">
+                <div className={`w-2 h-2 rounded-full ${LEVEL_CONFIG[level].bg}`} />
+                <span className="text-[11px] font-bold text-slate-400">{LEVEL_CONFIG[level].label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
+            최신순
+          </div>
         </div>
       </div>
 
