@@ -38,6 +38,22 @@ const createInitialSourceStatuses = (): SourceStatus[] => {
 };
 
 const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
+const MAX_EVENTS_PER_CATEGORY = 20;
+
+const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): DisasterEvent[] => {
+  const counts = new Map<string, number>();
+  const limited: DisasterEvent[] = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const event = items[i];
+    const count = counts.get(event.category) ?? 0;
+    if (count >= maxPerCategory) {
+      continue;
+    }
+    counts.set(event.category, count + 1);
+    limited.push(event);
+  }
+  return limited;
+};
 
 const App: React.FC = () => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
@@ -64,7 +80,7 @@ const App: React.FC = () => {
       }
       const next = [mappedEvent, ...prev];
       next.sort((a, b) => b.timestamp - a.timestamp);
-      return next.slice(0, 100);
+      return limitEventsByCategory(next, MAX_EVENTS_PER_CATEGORY);
     });
     setSourceStatuses((prev) => {
       const next = prev.slice();
@@ -130,7 +146,7 @@ const App: React.FC = () => {
         }
         const mapped = Array.from(mappedById.values());
         mapped.sort((a, b) => b.timestamp - a.timestamp);
-        setEvents(mapped.slice(0, 100));
+        setEvents(limitEventsByCategory(mapped, MAX_EVENTS_PER_CATEGORY));
         if (latestFetchedAt) {
           lastFetchedAtRef.current = latestFetchedAt;
         }
