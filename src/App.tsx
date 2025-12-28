@@ -1,73 +1,137 @@
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createEventSource, fetchSourceStatuses, getFetchedAtMs, parseEventData, toDisasterEvent } from './api';
 import CategoryGrid from './components/CategoryGrid';
 import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
-import { MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL } from './constants';
-import { type CategoryGroup, type DisasterEvent, EventLevel, type SourceStatus } from './types';
+import { EVENT_SOURCE_LABELS, MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL, SOURCE_DISPLAY_ORDER } from './constants';
+import { type CategoryGroup, type DisasterEvent, EventLevels, type SourceStatus } from './types';
+
+const createInitialSourceStatuses = (): SourceStatus[] => {
+  const initial: SourceStatus[] = [];
+  for (let i = 0; i < SOURCE_DISPLAY_ORDER.length; i += 1) {
+    const sourceId = SOURCE_DISPLAY_ORDER[i];
+    initial.push({
+      sourceId,
+      name: EVENT_SOURCE_LABELS[sourceId] ?? `#${sourceId}`,
+      isConnected: false,
+      lastUpdate: 0,
+    });
+  }
+  return initial;
+};
+
+const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
 
 const App: React.FC = () => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
-  const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>([
-    { name: '기상청', isConnected: true, lastUpdate: Date.now() },
-    { name: '산림청', isConnected: true, lastUpdate: Date.now() },
-    { name: '행안부', isConnected: true, lastUpdate: Date.now() },
-    { name: '환경부', isConnected: true, lastUpdate: Date.now() },
-    { name: '해경청', isConnected: true, lastUpdate: Date.now() },
-  ]);
+  const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const lastFetchedAtRef = useRef<number | null>(null);
+
+  const handleIncomingEvent = useCallback((rawData: string) => {
+    const parsed = parseEventData(rawData);
+    if (!parsed) {
+      return;
+    }
+    const mappedEvent = toDisasterEvent(parsed);
+    const fetchedAtMs = getFetchedAtMs(parsed);
+    if (fetchedAtMs && (lastFetchedAtRef.current === null || fetchedAtMs > lastFetchedAtRef.current)) {
+      lastFetchedAtRef.current = fetchedAtMs;
+    }
+    setEvents((prev) => {
+      for (let i = 0; i < prev.length; i += 1) {
+        if (prev[i].id === mappedEvent.id) {
+          return prev;
+        }
+      }
+      const next = [mappedEvent, ...prev];
+      next.sort((a, b) => b.timestamp - a.timestamp);
+      return next.slice(0, 100);
+    });
+    setSourceStatuses((prev) => {
+      const next = prev.slice();
+      const now = Date.now();
+      for (let i = 0; i < next.length; i += 1) {
+        if (next[i].sourceId === mappedEvent.sourceId) {
+          next[i] = { ...next[i], isConnected: true, lastUpdate: now };
+          return next;
+        }
+      }
+      return [
+        ...next,
+        {
+          sourceId: mappedEvent.sourceId,
+          name: mappedEvent.source,
+          isConnected: true,
+          lastUpdate: now,
+        },
+      ];
+    });
+  }, []);
 
   useEffect(() => {
-    const mockCategories = ['지진', '산불', '호우', '태풍', '대설', '강풍', '황사', '폭염'];
-    const mockSources = ['기상청', '산림청', '행안부', '환경부', '해경청'];
-    const mockLevels = Object.values(EventLevel);
-
-    const createRandomEvent = (): DisasterEvent => {
-      const source = mockSources[Math.floor(Math.random() * mockSources.length)];
-      const category = mockCategories[Math.floor(Math.random() * mockCategories.length)];
-      const level = mockLevels[Math.floor(Math.random() * mockLevels.length)];
-
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        category,
-        source,
-        level,
-        title: `${category} 관련 긴급 안내 - ${source}`,
-        content:
-          level === EventLevel.CRITICAL || level === EventLevel.SEVERE
-            ? `인근 주민들께서는 즉시 안전한 곳으로 대피하시고, TV나 라디오 등 재난 방송에 귀를 기울여 주시기 바랍니다.`
-            : `${category} 상황을 모니터링 중입니다. 외출 시 유의하시기 바랍니다.`,
-        timestamp: Date.now(),
+    const connectStream = (since?: string) => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+      const stream = createEventSource(since);
+      eventSourceRef.current = stream;
+      stream.onmessage = (message) => {
+        handleIncomingEvent(message.data);
+      };
+      stream.onerror = () => {
+        stream.close();
+        if (reconnectTimeoutRef.current !== null) {
+          window.clearTimeout(reconnectTimeoutRef.current);
+        }
+        reconnectTimeoutRef.current = window.setTimeout(() => {
+          const sinceMs = lastFetchedAtRef.current;
+          const sinceValue = sinceMs ? new Date(sinceMs).toISOString() : undefined;
+          connectStream(sinceValue);
+        }, 3000);
       };
     };
 
-    const initialEvents = Array.from({ length: 30 }).map(createRandomEvent);
-    setEvents(initialEvents);
-
-    const interval = setInterval(() => {
-      const newEvent = createRandomEvent();
-      setEvents((prev) => [newEvent, ...prev].slice(0, 100));
-
-      // Update source status when event arrives
-      setSourceStatuses((prev) =>
-        prev.map((s) => (s.name === newEvent.source ? { ...s, lastUpdate: Date.now(), isConnected: true } : s)),
-      );
-    }, 6000);
-
-    // Simulate occasional disconnection for broadcast realism
-    const connectionSimulation = setInterval(() => {
-      setSourceStatuses((prev) =>
-        prev.map((s) => {
-          // Randomly "disconnect" or "reconnect"
-          const isStillConnected = Math.random() > 0.05;
-          return { ...s, isConnected: isStillConnected };
-        }),
-      );
-    }, 15000);
+    connectStream();
 
     return () => {
-      clearInterval(interval);
-      clearInterval(connectionSimulation);
+      if (reconnectTimeoutRef.current !== null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, [handleIncomingEvent]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadStatuses = async () => {
+      try {
+        const nextStatuses = await fetchSourceStatuses();
+        if (isActive) {
+          setSourceStatuses(nextStatuses);
+        }
+      } catch (error) {
+        console.error(error);
+        if (isActive) {
+          setSourceStatuses((prev) => prev.map((status) => ({ ...status, isConnected: false })));
+        }
+      }
+    };
+
+    void loadStatuses();
+    const intervalId = window.setInterval(() => {
+      void loadStatuses();
+    }, 20000);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -75,11 +139,11 @@ const App: React.FC = () => {
     return events
       .filter((e) => {
         const priorityMap = {
-          [EventLevel.INFO]: 0,
-          [EventLevel.MINOR]: 1,
-          [EventLevel.MODERATE]: 2,
-          [EventLevel.SEVERE]: 3,
-          [EventLevel.CRITICAL]: 4,
+          [EventLevels.Info]: 0,
+          [EventLevels.Minor]: 1,
+          [EventLevels.Moderate]: 2,
+          [EventLevels.Severe]: 3,
+          [EventLevels.Critical]: 4,
         };
         return priorityMap[e.level] >= priorityMap[SIDEBAR_MIN_LEVEL];
       })
@@ -88,12 +152,13 @@ const App: React.FC = () => {
 
   const categoryGroups = useMemo(() => {
     const groups: Record<string, DisasterEvent[]> = {};
-    events.forEach((e) => {
-      if (!groups[e.category]) {
-        groups[e.category] = [];
+    for (let i = 0; i < events.length; i += 1) {
+      const event = events[i];
+      if (!groups[event.category]) {
+        groups[event.category] = [];
       }
-      groups[e.category].push(e);
-    });
+      groups[event.category].push(event);
+    }
 
     const sortedGroups: CategoryGroup[] = Object.keys(groups).map((cat) => ({
       category: cat,

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ShieldAlert } from 'lucide-react';
 import type React from 'react';
 import { LEVEL_CONFIG } from '../constants';
-import type { DisasterEvent } from '../types';
+import { type DisasterEvent, EventLevels } from '../types';
 
 interface SidebarProps {
   events: DisasterEvent[];
@@ -49,7 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                 </div>
 
                 {/* Subtle highlight for critical */}
-                {event.level === 'Critical' && (
+                {event.level === EventLevels.Critical && (
                   <div className="absolute top-0 right-0 w-16 h-16 bg-red-600/10 rounded-full -mr-8 -mt-8 animate-pulse" />
                 )}
               </motion.div>

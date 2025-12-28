@@ -1,19 +1,75 @@
-export enum EventLevel {
-  INFO = 'Info',
-  MINOR = 'Minor',
-  MODERATE = 'Moderate',
-  SEVERE = 'Severe',
-  CRITICAL = 'Critical',
+export enum EventLevels {
+  Info = 1,
+  Minor = 2,
+  Moderate = 3,
+  Severe = 4,
+  Critical = 5,
+}
+
+export enum EventKinds {
+  Other = 1,
+  Quake = 2,
+  Ai = 3,
+  Drought = 4,
+  Livestock = 5,
+  Wind = 6,
+  Dry = 7,
+  Transport = 8,
+  TrafficCrash = 9,
+  TrafficCtrl = 10,
+  Finance = 11,
+  Snow = 12,
+  FineDust = 13,
+  CivDef = 14,
+  Collapse = 15,
+  Wildfire = 16,
+  Landslide = 17,
+  Water = 18,
+  Fog = 19,
+  Energy = 20,
+  Epidemic = 21,
+  Blackout = 22,
+  Tsunami = 23,
+  Typhoon = 24,
+  Terror = 25,
+  Telecom = 26,
+  Explosion = 27,
+  Heat = 28,
+  HighSeas = 29,
+  Cold = 30,
+  Rain = 31,
+  Flood = 32,
+  Fire = 33,
+  Pollution = 34,
+  YellowDust = 35,
+  O3 = 36,
+}
+
+export enum EventSources {
+  SafekoreaSms = 1,
+  KmaMicroEarthquake = 2,
+  KmaPewsEarthquake = 3,
+  NfdsFireDispatch = 4,
+  KmaWeatherWarning = 5,
+  UticTrafficIncident = 6,
+  AirkoreaPmWarning = 7,
+  AirkoreaO3Warning = 8,
+  ForestFireInfo = 9,
 }
 
 export interface DisasterEvent {
   id: string;
+  sourceId: number;
   source: string;
+  kind: number;
   category: string;
   title: string;
   content?: string;
-  level: EventLevel;
+  level: EventLevels;
   timestamp: number;
+  fetchedAt: string;
+  occurredAt: string | null;
+  regionText: string | null;
 }
 
 export type CategoryGroup = {
@@ -23,6 +79,7 @@ export type CategoryGroup = {
 };
 
 export interface SourceStatus {
+  sourceId: number;
   name: string;
   isConnected: boolean;
   lastUpdate: number;

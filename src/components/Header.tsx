@@ -44,7 +44,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses }) => {
           </div>
           <div className="flex space-x-2">
             {sourceStatuses.map((source) => (
-              <div key={source.name} className="flex flex-col items-center">
+              <div key={source.sourceId} className="flex flex-col items-center">
                 <div
                   className={`w-2.5 h-2.5 rounded-full mb-1 transition-all duration-500 ${
                     source.isConnected
@@ -52,7 +52,11 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses }) => {
                       : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse'
                   }`}
                 />
-                <span className={`text-[10px] font-bold ${source.isConnected ? 'text-slate-300' : 'text-red-400'}`}>
+                <span
+                  className={`text-[10px] font-bold leading-tight whitespace-pre-line text-center ${
+                    source.isConnected ? 'text-slate-300' : 'text-red-400'
+                  }`}
+                >
                   {source.name}
                 </span>
               </div>
