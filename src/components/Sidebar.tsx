@@ -59,7 +59,9 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
       </div>
 
       <div className="p-4 bg-slate-900 border-t border-slate-800 text-[10px] text-slate-500 font-bold text-center">
-        실시간 자동 업데이트 (수신 대기 중)
+        본 프로젝트는 비영리로 운영되며 제공 정보에 대한 어떠한 보증도 하지 않습니다.
+        <br />
+        반드시 공식적인 경로를 통해 상황을 확인하시기 바랍니다.
       </div>
     </aside>
   );
