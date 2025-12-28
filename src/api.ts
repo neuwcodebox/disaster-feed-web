@@ -115,6 +115,15 @@ export const fetchSourceStatuses = async (): Promise<SourceStatus[]> => {
   return mapped;
 };
 
+export const fetchInitialEvents = async (): Promise<ApiEvent[]> => {
+  const response = await fetch(buildApiUrl('/api/events'));
+  if (!response.ok) {
+    throw new Error(`Failed to fetch initial events: ${response.status}`);
+  }
+  const payload = z.array(schemaEvent).parse(await response.json());
+  return payload;
+};
+
 export const parseEventData = (raw: string): ApiEvent | null => {
   let parsed: unknown;
   try {

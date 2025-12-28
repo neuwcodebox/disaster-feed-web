@@ -1,6 +1,13 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createEventSource, fetchSourceStatuses, getFetchedAtMs, parseEventData, toDisasterEvent } from './api';
+import {
+  createEventSource,
+  fetchInitialEvents,
+  fetchSourceStatuses,
+  getFetchedAtMs,
+  parseEventData,
+  toDisasterEvent,
+} from './api';
 import CategoryGrid from './components/CategoryGrid';
 import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
@@ -73,6 +80,34 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
+
+    const loadInitialEvents = async () => {
+      try {
+        const payload = await fetchInitialEvents();
+        if (!isActive) {
+          return;
+        }
+        const mapped: DisasterEvent[] = [];
+        let latestFetchedAt: number | null = lastFetchedAtRef.current;
+        for (let i = 0; i < payload.length; i += 1) {
+          const mappedEvent = toDisasterEvent(payload[i]);
+          mapped.push(mappedEvent);
+          const fetchedAtMs = getFetchedAtMs(payload[i]);
+          if (fetchedAtMs && (latestFetchedAt === null || fetchedAtMs > latestFetchedAt)) {
+            latestFetchedAt = fetchedAtMs;
+          }
+        }
+        mapped.sort((a, b) => b.timestamp - a.timestamp);
+        setEvents(mapped.slice(0, 100));
+        if (latestFetchedAt) {
+          lastFetchedAtRef.current = latestFetchedAt;
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
     const connectStream = (since?: string) => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -95,9 +130,20 @@ const App: React.FC = () => {
       };
     };
 
-    connectStream();
+    const startStream = async () => {
+      await loadInitialEvents();
+      if (!isActive) {
+        return;
+      }
+      const sinceMs = lastFetchedAtRef.current;
+      const sinceValue = sinceMs ? new Date(sinceMs).toISOString() : undefined;
+      connectStream(sinceValue);
+    };
+
+    void startStream();
 
     return () => {
+      isActive = false;
       if (reconnectTimeoutRef.current !== null) {
         window.clearTimeout(reconnectTimeoutRef.current);
       }
@@ -147,7 +193,7 @@ const App: React.FC = () => {
         };
         return priorityMap[e.level] >= priorityMap[SIDEBAR_MIN_LEVEL];
       })
-      .slice(0, 8);
+      .slice(0, 20);
   }, [events]);
 
   const categoryGroups = useMemo(() => {

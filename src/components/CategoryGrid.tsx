@@ -16,7 +16,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
       <div className="flex items-center justify-between mb-4 ml-2 shrink-0">
         <div className="flex items-center space-x-2">
           <LayoutGrid className="w-5 h-5 text-blue-500" />
-          <h2 className="text-xl font-bold text-slate-300">분야별 실시간 상황판</h2>
+          <h2 className="text-xl font-bold text-slate-300">종류별 상황판</h2>
         </div>
         <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
           최근 활성 종류 우선 정렬
@@ -54,7 +54,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
               <div className="flex-1 overflow-hidden relative">
                 <div className="absolute inset-0 p-2 space-y-1 overflow-hidden">
                   <AnimatePresence mode="popLayout">
-                    {group.events.slice(0, 4).map((event, idx) => (
+                    {group.events.slice(0, 20).map((event, idx) => (
                       <motion.div
                         key={event.id}
                         layout
