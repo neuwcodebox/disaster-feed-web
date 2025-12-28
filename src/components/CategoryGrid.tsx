@@ -111,8 +111,14 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                               >
                                 {event.title}
                               </h4>
-                              {idx === 0 && event.content && (
-                                <p className="text-[10px] text-slate-500 mt-0.5 font-medium leading-tight whitespace-pre-line break-words">
+                              {event.content && (
+                                <p
+                                  className={
+                                    idx === 0
+                                      ? 'text-[10px] text-slate-500 mt-0.5 font-medium leading-tight whitespace-pre-line break-words'
+                                      : 'text-[10px] text-slate-500 mt-0.5 font-medium leading-tight truncate'
+                                  }
+                                >
                                   {event.content}
                                 </p>
                               )}
