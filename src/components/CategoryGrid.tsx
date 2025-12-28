@@ -105,7 +105,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                                 </span>
                               </div>
                               <h4
-                                className={`text-xs md:text-[13px] font-bold leading-tight truncate ${
+                                className={`text-xs md:text-[13px] font-bold leading-tight whitespace-pre-line break-all ${
                                   idx === 0 ? 'text-slate-100' : 'text-slate-400'
                                 }`}
                               >
