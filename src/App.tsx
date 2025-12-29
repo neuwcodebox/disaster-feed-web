@@ -39,6 +39,13 @@ const createInitialSourceStatuses = (): SourceStatus[] => {
 const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
 const MAX_EVENTS_PER_CATEGORY = 20;
 
+const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number => {
+  if (a.timestamp !== b.timestamp) {
+    return b.timestamp - a.timestamp;
+  }
+  return b.id.localeCompare(a.id);
+};
+
 const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): DisasterEvent[] => {
   const counts = new Map<string, number>();
   const limited: DisasterEvent[] = [];
@@ -77,7 +84,7 @@ const App: React.FC = () => {
         }
       }
       const next = [mappedEvent, ...prev];
-      next.sort((a, b) => b.timestamp - a.timestamp);
+      next.sort(compareEventsByOccurrence);
       return limitEventsByCategory(next, MAX_EVENTS_PER_CATEGORY);
     });
     setSourceStatuses((prev) => {
@@ -138,12 +145,7 @@ const App: React.FC = () => {
           }
         }
         const mapped = Array.from(mappedById.values());
-        mapped.sort((a, b) => {
-          if (a.id === b.id) {
-            return 0;
-          }
-          return a.id < b.id ? 1 : -1;
-        });
+        mapped.sort(compareEventsByOccurrence);
         setEvents(limitEventsByCategory(mapped, MAX_EVENTS_PER_CATEGORY));
         if (mapped.length > 0) {
           lastEventIdRef.current = mapped[0].id;
@@ -240,7 +242,7 @@ const App: React.FC = () => {
     }));
 
     return sortedGroups
-      .sort((a, b) => b.latestEvent.timestamp - a.latestEvent.timestamp)
+      .sort((a, b) => compareEventsByOccurrence(a.latestEvent, b.latestEvent))
       .slice(0, MAX_CATEGORIES_DISPLAY);
   }, [events]);
 
