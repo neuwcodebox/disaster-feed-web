@@ -105,9 +105,11 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                                 >
                                   {LEVEL_CONFIG[event.level].label}
                                 </span>
-                                <span className="text-[8px] md:text-[9px] font-bold text-slate-500">
-                                  {formatRelativeTime(event.timestamp)}
-                                </span>
+                                <div className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold">
+                                  <span className="text-slate-500">{formatRelativeTime(event.timestamp)}</span>
+                                  <span className="text-slate-500">·</span>
+                                  <span className="text-slate-500">{event.source}</span>
+                                </div>
                               </div>
                               <h4
                                 className={`text-xs md:text-[13px] font-bold leading-tight whitespace-pre-line break-all ${
