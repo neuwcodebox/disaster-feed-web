@@ -79,10 +79,10 @@ const getKindLabel = (kind: number): string => {
   return label ?? '기타';
 };
 
-export const createEventSource = (since?: string): EventSource => {
+export const createEventSource = (afterId?: string): EventSource => {
   const url = new URL(buildApiUrl('/api/events/stream'));
-  if (since) {
-    url.searchParams.set('since', since);
+  if (afterId) {
+    url.searchParams.set('afterId', afterId);
   }
   return new EventSource(url.toString());
 };

@@ -6,7 +6,6 @@ import {
   fetchEventsByKind,
   fetchInitialEvents,
   fetchSourceStatuses,
-  getFetchedAtMs,
   parseEventData,
   toDisasterEvent,
 } from './api';
@@ -59,18 +58,17 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-  const lastFetchedAtRef = useRef<number | null>(null);
+  const lastEventIdRef = useRef<string | null>(null);
 
-  const handleIncomingEvent = useCallback((rawData: string) => {
-    const parsed = parseEventData(rawData);
+  const handleIncomingEvent = useCallback((message: MessageEvent<string>) => {
+    const parsed = parseEventData(message.data);
     if (!parsed) {
       return;
     }
     const mappedEvent = toDisasterEvent(parsed);
-    const fetchedAtMs = getFetchedAtMs(parsed);
-    if (fetchedAtMs && (lastFetchedAtRef.current === null || fetchedAtMs > lastFetchedAtRef.current)) {
-      lastFetchedAtRef.current = fetchedAtMs;
+    const eventId = message.lastEventId || parsed.id;
+    if (eventId) {
+      lastEventIdRef.current = eventId;
     }
     setEvents((prev) => {
       for (let i = 0; i < prev.length; i += 1) {
@@ -132,49 +130,36 @@ const App: React.FC = () => {
           }
         }
         const mappedById = new Map<string, DisasterEvent>();
-        let latestFetchedAt: number | null = lastFetchedAtRef.current;
         for (let i = 0; i < combined.length; i += 1) {
           const mappedEvent = toDisasterEvent(combined[i]);
           const existing = mappedById.get(mappedEvent.id);
           if (!existing || mappedEvent.timestamp > existing.timestamp) {
             mappedById.set(mappedEvent.id, mappedEvent);
           }
-          const fetchedAtMs = getFetchedAtMs(combined[i]);
-          if (fetchedAtMs && (latestFetchedAt === null || fetchedAtMs > latestFetchedAt)) {
-            latestFetchedAt = fetchedAtMs;
-          }
         }
         const mapped = Array.from(mappedById.values());
-        mapped.sort((a, b) => b.timestamp - a.timestamp);
+        mapped.sort((a, b) => {
+          if (a.id === b.id) {
+            return 0;
+          }
+          return a.id < b.id ? 1 : -1;
+        });
         setEvents(limitEventsByCategory(mapped, MAX_EVENTS_PER_CATEGORY));
-        if (latestFetchedAt) {
-          lastFetchedAtRef.current = latestFetchedAt;
+        if (mapped.length > 0) {
+          lastEventIdRef.current = mapped[0].id;
         }
       } catch (error) {
         console.error(error);
       }
     };
 
-    const connectStream = (since?: string) => {
+    const connectStream = (afterId?: string) => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
-      const stream = createEventSource(since);
+      const stream = createEventSource(afterId);
       eventSourceRef.current = stream;
-      stream.onmessage = (message) => {
-        handleIncomingEvent(message.data);
-      };
-      stream.onerror = () => {
-        stream.close();
-        if (reconnectTimeoutRef.current !== null) {
-          window.clearTimeout(reconnectTimeoutRef.current);
-        }
-        reconnectTimeoutRef.current = window.setTimeout(() => {
-          const sinceMs = lastFetchedAtRef.current;
-          const sinceValue = sinceMs ? new Date(sinceMs).toISOString() : undefined;
-          connectStream(sinceValue);
-        }, 3000);
-      };
+      stream.onmessage = handleIncomingEvent;
     };
 
     const startStream = async () => {
@@ -182,18 +167,13 @@ const App: React.FC = () => {
       if (!isActive) {
         return;
       }
-      const sinceMs = lastFetchedAtRef.current;
-      const sinceValue = sinceMs ? new Date(sinceMs).toISOString() : undefined;
-      connectStream(sinceValue);
+      connectStream(lastEventIdRef.current ?? undefined);
     };
 
     void startStream();
 
     return () => {
       isActive = false;
-      if (reconnectTimeoutRef.current !== null) {
-        window.clearTimeout(reconnectTimeoutRef.current);
-      }
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
