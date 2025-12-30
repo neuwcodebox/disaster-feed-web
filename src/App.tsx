@@ -15,6 +15,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import {
   EVENT_KIND_VALUES,
+  EVENT_LEVEL_SOUNDS,
   MAX_CATEGORIES_DISPLAY,
   SIDEBAR_MIN_LEVEL,
   SOURCE_DISPLAY_ORDER,
@@ -38,6 +39,9 @@ const createInitialSourceStatuses = (): SourceStatus[] => {
 
 const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
 const MAX_EVENTS_PER_CATEGORY = 20;
+const ALERT_SOUND_WINDOW_MS = 1000;
+const ALERT_SOUND_MIN_LEVEL = EventLevels.Moderate;
+const ALERT_SOUND_LEVELS: EventLevels[] = [EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
 
 const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number => {
   if (a.timestamp !== b.timestamp) {
@@ -64,48 +68,128 @@ const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): 
 const App: React.FC = () => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
+  const [isMuted, setIsMuted] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastEventIdRef = useRef<string | null>(null);
+  const alertSoundsRef = useRef<Partial<Record<EventLevels, HTMLAudioElement>> | null>(null);
+  const alertCooldownTimerRef = useRef<number | null>(null);
+  const pendingAlertLevelRef = useRef<EventLevels | null>(null);
 
-  const handleIncomingEvent = useCallback((message: MessageEvent<string>) => {
-    const parsed = parseEventData(message.data);
-    if (!parsed) {
+  const prepareAlertSounds = useCallback(() => {
+    if (alertSoundsRef.current) {
       return;
     }
-    const mappedEvent = toDisasterEvent(parsed);
-    const eventId = message.lastEventId || parsed.id;
-    if (eventId) {
-      lastEventIdRef.current = eventId;
+    const sounds: Partial<Record<EventLevels, HTMLAudioElement>> = {};
+    for (let i = 0; i < ALERT_SOUND_LEVELS.length; i += 1) {
+      const level = ALERT_SOUND_LEVELS[i];
+      const source = EVENT_LEVEL_SOUNDS[level];
+      if (!source) {
+        continue;
+      }
+      const audio = new Audio(source);
+      audio.preload = 'auto';
+      sounds[level] = audio;
     }
-    setEvents((prev) => {
-      for (let i = 0; i < prev.length; i += 1) {
-        if (prev[i].id === mappedEvent.id) {
-          return prev;
-        }
+    alertSoundsRef.current = sounds;
+  }, []);
+
+  const playAlertSound = useCallback(
+    (level: EventLevels) => {
+      if (isMuted) {
+        return;
       }
-      const next = [mappedEvent, ...prev];
-      next.sort(compareEventsByOccurrence);
-      return limitEventsByCategory(next, MAX_EVENTS_PER_CATEGORY);
-    });
-    setSourceStatuses((prev) => {
-      const next = prev.slice();
-      const now = Date.now();
-      for (let i = 0; i < next.length; i += 1) {
-        if (next[i].sourceId === mappedEvent.sourceId) {
-          next[i] = { ...next[i], isConnected: true, lastUpdate: now };
-          return next;
-        }
+      prepareAlertSounds();
+      const audio = alertSoundsRef.current?.[level];
+      if (!audio) {
+        return;
       }
-      return [
-        ...next,
-        {
-          sourceId: mappedEvent.sourceId,
-          name: mappedEvent.source,
-          isConnected: true,
-          lastUpdate: now,
-        },
-      ];
-    });
+      audio.currentTime = 0;
+      void audio.play().catch((error: unknown) => {
+        console.warn('알림음을 재생하지 못했습니다.', error);
+      });
+    },
+    [isMuted, prepareAlertSounds],
+  );
+
+  const scheduleAlertWindow = useCallback(() => {
+    if (alertCooldownTimerRef.current) {
+      return;
+    }
+    alertCooldownTimerRef.current = window.setTimeout(() => {
+      alertCooldownTimerRef.current = null;
+      const pendingLevel = pendingAlertLevelRef.current;
+      pendingAlertLevelRef.current = null;
+      if (pendingLevel != null) {
+        playAlertSound(pendingLevel);
+      }
+    }, ALERT_SOUND_WINDOW_MS);
+  }, [playAlertSound]);
+
+  const handleAlertLevel = useCallback(
+    (level: EventLevels) => {
+      if (level < ALERT_SOUND_MIN_LEVEL) {
+        return;
+      }
+      const pendingLevel = pendingAlertLevelRef.current;
+      if (pendingLevel == null || level > pendingLevel) {
+        pendingAlertLevelRef.current = level;
+      }
+      scheduleAlertWindow();
+    },
+    [scheduleAlertWindow],
+  );
+
+  const handleIncomingEvent = useCallback(
+    (message: MessageEvent<string>) => {
+      const parsed = parseEventData(message.data);
+      if (!parsed) {
+        return;
+      }
+      const mappedEvent = toDisasterEvent(parsed);
+      const eventId = message.lastEventId || parsed.id;
+      if (eventId) {
+        lastEventIdRef.current = eventId;
+      }
+      handleAlertLevel(mappedEvent.level);
+      setEvents((prev) => {
+        for (let i = 0; i < prev.length; i += 1) {
+          if (prev[i].id === mappedEvent.id) {
+            return prev;
+          }
+        }
+        const next = [mappedEvent, ...prev];
+        next.sort(compareEventsByOccurrence);
+        return limitEventsByCategory(next, MAX_EVENTS_PER_CATEGORY);
+      });
+      setSourceStatuses((prev) => {
+        const next = prev.slice();
+        const now = Date.now();
+        for (let i = 0; i < next.length; i += 1) {
+          if (next[i].sourceId === mappedEvent.sourceId) {
+            next[i] = { ...next[i], isConnected: true, lastUpdate: now };
+            return next;
+          }
+        }
+        return [
+          ...next,
+          {
+            sourceId: mappedEvent.sourceId,
+            name: mappedEvent.source,
+            isConnected: true,
+            lastUpdate: now,
+          },
+        ];
+      });
+    },
+    [handleAlertLevel],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (alertCooldownTimerRef.current) {
+        window.clearTimeout(alertCooldownTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -249,7 +333,7 @@ const App: React.FC = () => {
   return (
     // On mobile, we use min-h-screen and allow overflow. On desktop, fixed h-screen.
     <div className="min-h-screen lg:h-screen w-full flex flex-col bg-slate-950 text-slate-50 border-0 md:border-2 border-slate-900 select-none overflow-x-hidden">
-      <Header sourceStatuses={sourceStatuses} />
+      <Header sourceStatuses={sourceStatuses} isMuted={isMuted} onToggleMute={() => setIsMuted((prev) => !prev)} />
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Sidebar: Above grid on mobile, Left side on desktop */}

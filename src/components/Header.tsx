@@ -1,15 +1,17 @@
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Activity, Clock } from 'lucide-react';
+import { Activity, Clock, Volume2, VolumeOff } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import type { SourceStatus } from '../types';
 
 interface HeaderProps {
   sourceStatuses: SourceStatus[];
+  isMuted: boolean;
+  onToggleMute: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ sourceStatuses }) => {
+const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }) => {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -62,14 +64,24 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses }) => {
           </div>
         </div>
 
-        <div className="flex flex-col items-end shrink-0">
-          <div className="flex items-center space-x-1 md:space-x-2 text-base md:text-2xl font-mono font-bold text-white leading-none">
-            <Clock className="w-3.5 h-3.5 md:w-5 md:h-5 text-blue-400" />
-            <span>{format(now, 'HH:mm:ss')}</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={onToggleMute}
+            aria-label={isMuted ? '알림음 켜기' : '알림음 끄기'}
+            className="inline-flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-full border border-slate-700 bg-slate-950/60 text-slate-200 hover:text-white hover:border-slate-500 transition"
+          >
+            {isMuted ? <VolumeOff className="w-3 h-3 md:w-4 md:h-4" /> : <Volume2 className="w-3 h-3 md:w-4 md:h-4" />}
+          </button>
+          <div className="flex flex-col items-end">
+            <div className="flex items-center space-x-1 md:space-x-2 text-base md:text-2xl font-mono font-bold text-white leading-none">
+              <Clock className="w-3.5 h-3.5 md:w-5 md:h-5 text-blue-400" />
+              <span>{format(now, 'HH:mm:ss')}</span>
+            </div>
+            <span className="hidden sm:block text-[9px] md:text-xs text-slate-400 font-semibold mt-1">
+              {format(now, 'yyyy년 MM월 dd일 (EEEE)', { locale: ko })}
+            </span>
           </div>
-          <span className="hidden sm:block text-[9px] md:text-xs text-slate-400 font-semibold mt-1">
-            {format(now, 'yyyy년 MM월 dd일 (EEEE)', { locale: ko })}
-          </span>
         </div>
       </div>
     </header>

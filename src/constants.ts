@@ -38,6 +38,12 @@ export const LEVEL_CONFIG = {
   },
 };
 
+export const EVENT_LEVEL_SOUNDS: Partial<Record<EventLevels, string>> = {
+  [EventLevels.Moderate]: '/sounds/level-moderate.mp3',
+  [EventLevels.Severe]: '/sounds/level-severe.mp3',
+  [EventLevels.Critical]: '/sounds/level-critical.mp3',
+};
+
 export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.Other]: '기타',
   [EventKinds.Quake]: '지진',
