@@ -16,6 +16,8 @@ const formatRelativeTime = (timestamp: number) =>
     locale: ko,
   });
 
+const highlightTransition = { duration: 3.5, ease: 'easeOut' } as const;
+
 const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
   const levels = [EventLevels.Info, EventLevels.Minor, EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
 
@@ -88,12 +90,21 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                           layout
                           initial={{ opacity: 0, y: 5 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className={`p-2 rounded-lg transition-all duration-300 border ${
+                          className={`relative overflow-hidden p-2 rounded-lg transition-all duration-300 border ${
                             idx === 0
-                              ? 'bg-slate-800/80 border-slate-600/50 shadow-md ring-1 ring-slate-700/30'
+                              ? 'bg-slate-900/40 border-slate-600/50 shadow-md ring-1 ring-slate-700/30 hover:bg-slate-800/40'
                               : 'bg-slate-900/40 border-transparent hover:bg-slate-800/40 hover:border-slate-700/30'
                           }`}
                         >
+                          {event.isRealtime && (
+                            <motion.div
+                              aria-hidden="true"
+                              className={`absolute inset-0 ${LEVEL_CONFIG[event.level].bg} pointer-events-none`}
+                              initial={{ opacity: 0.25 }}
+                              animate={{ opacity: 0 }}
+                              transition={highlightTransition}
+                            />
+                          )}
                           <div className="flex items-start space-x-2">
                             {/* Intensity Indicator */}
                             <div className={`mt-1.5 w-1 h-1 rounded-full shrink-0 ${LEVEL_CONFIG[event.level].bg}`} />

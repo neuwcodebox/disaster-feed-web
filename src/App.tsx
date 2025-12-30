@@ -145,7 +145,7 @@ const App: React.FC = () => {
       if (!parsed) {
         return;
       }
-      const mappedEvent = toDisasterEvent(parsed);
+      const mappedEvent = toDisasterEvent(parsed, true);
       const eventId = message.lastEventId || parsed.id;
       if (eventId) {
         lastEventIdRef.current = eventId;

@@ -16,6 +16,8 @@ const formatRelativeTime = (timestamp: number) =>
     locale: ko,
   });
 
+const highlightTransition = { duration: 3.5, ease: 'easeOut' } as const;
+
 const Sidebar: React.FC<SidebarProps> = ({ events }) => {
   return (
     <aside className="w-full lg:w-96 bg-slate-900/50 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col shrink-0">
@@ -37,6 +39,15 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                 exit={{ opacity: 0, scale: 0.9 }}
                 className={`shrink-0 w-64 lg:w-full p-3 md:p-4 rounded-xl border-l-4 md:border-l-8 ${LEVEL_CONFIG[event.level].border} bg-slate-800 shadow-lg relative overflow-hidden`}
               >
+                {event.isRealtime && (
+                  <motion.div
+                    aria-hidden="true"
+                    className={`absolute inset-0 ${LEVEL_CONFIG[event.level].bg} pointer-events-none`}
+                    initial={{ opacity: 0.35 }}
+                    animate={{ opacity: 0 }}
+                    transition={highlightTransition}
+                  />
+                )}
                 <div className="flex justify-between items-start mb-1.5 md:mb-2">
                   <span
                     className={`px-1.5 py-0.5 rounded text-[8px] md:text-[10px] font-bold ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}

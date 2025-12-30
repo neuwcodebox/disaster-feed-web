@@ -158,7 +158,7 @@ export const parseEventData = (raw: string): ApiEvent | null => {
   return result.data;
 };
 
-export const toDisasterEvent = (event: ApiEvent): DisasterEvent => {
+export const toDisasterEvent = (event: ApiEvent, isRealtime = false): DisasterEvent => {
   const occurredAtMs = parseDateMs(event.occurredAt);
   const fetchedAtMs = parseDateMs(event.fetchedAt);
   const timestamp = occurredAtMs ?? fetchedAtMs ?? Date.now();
@@ -175,6 +175,7 @@ export const toDisasterEvent = (event: ApiEvent): DisasterEvent => {
     fetchedAt: event.fetchedAt,
     occurredAt: event.occurredAt,
     regionText: event.regionText,
+    isRealtime,
   };
 };
 

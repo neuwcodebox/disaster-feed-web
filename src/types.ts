@@ -71,6 +71,7 @@ export interface DisasterEvent {
   fetchedAt: string;
   occurredAt: string | null;
   regionText: string | null;
+  isRealtime: boolean;
 }
 
 export type CategoryGroup = {
