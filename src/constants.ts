@@ -132,6 +132,7 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.AirkoreaPmWarning]: '환경부\n(PM)',
   [EventSources.AirkoreaO3Warning]: '환경부\n(O3)',
   [EventSources.ForestFireInfo]: '산림청\n(산불)',
+  [EventSources.YnaNews]: '연합뉴스',
 };
 
 export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
@@ -144,6 +145,7 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.AirkoreaPmWarning]: '환경부',
   [EventSources.AirkoreaO3Warning]: '환경부',
   [EventSources.ForestFireInfo]: '산림청',
+  [EventSources.YnaNews]: '연합뉴스',
 };
 
 export const SOURCE_DISPLAY_ORDER: EventSources[] = [
@@ -156,6 +158,7 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.AirkoreaPmWarning,
   EventSources.AirkoreaO3Warning,
   EventSources.ForestFireInfo,
+  EventSources.YnaNews,
 ];
 
 export const MAX_CATEGORIES_DISPLAY = 6;
