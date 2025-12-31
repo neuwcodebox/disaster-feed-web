@@ -80,6 +80,8 @@ export type CategoryGroup = {
   events: DisasterEvent[];
 };
 
+export type CategorySortMode = 'latest' | 'score';
+
 export interface SourceStatus {
   sourceId: number;
   name: string;

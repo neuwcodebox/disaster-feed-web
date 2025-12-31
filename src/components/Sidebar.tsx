@@ -21,9 +21,14 @@ const highlightTransition = { duration: 3.5, ease: 'easeOut' } as const;
 const Sidebar: React.FC<SidebarProps> = ({ events }) => {
   return (
     <aside className="w-full lg:w-96 bg-slate-900/50 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col shrink-0">
-      <div className="p-3 md:p-5 bg-slate-800/80 flex items-center space-x-2 border-b border-slate-700">
-        <ShieldAlert className="w-5 h-5 md:w-6 md:h-6 text-orange-500" />
-        <h2 className="text-base md:text-xl font-bold tracking-tight">주요 재난 상황</h2>
+      <div className="p-3 md:p-5 bg-slate-800/80 flex items-center justify-between border-b border-slate-700">
+        <div className="flex items-center space-x-2">
+          <ShieldAlert className="w-5 h-5 md:w-6 md:h-6 text-orange-500" />
+          <h2 className="text-base md:text-xl font-bold tracking-tight">주요 재난 상황</h2>
+        </div>
+        <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest bg-slate-900/50 px-2 py-1 rounded-full border border-slate-700 text-slate-400">
+          우선순
+        </span>
       </div>
 
       {/* Scrollable area: Horizontal on mobile, Vertical on Desktop */}

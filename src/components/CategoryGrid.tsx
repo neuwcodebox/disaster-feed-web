@@ -4,10 +4,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { LayoutGrid } from 'lucide-react';
 import type React from 'react';
 import { getEventKindIcon, LEVEL_CONFIG } from '../constants';
-import { type CategoryGroup, EventLevels } from '../types';
+import { type CategoryGroup, type CategorySortMode, EventLevels } from '../types';
 
 interface CategoryGridProps {
   groups: CategoryGroup[];
+  sortMode: CategorySortMode;
+  onSortModeChange: (mode: CategorySortMode) => void;
 }
 
 const formatRelativeTime = (timestamp: number) =>
@@ -18,8 +20,10 @@ const formatRelativeTime = (timestamp: number) =>
 
 const highlightTransition = { duration: 3.5, ease: 'easeOut' } as const;
 
-const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
+const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortModeChange }) => {
   const levels = [EventLevels.Info, EventLevels.Minor, EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
+  const isLatest = sortMode === 'latest';
+  const isScore = sortMode === 'score';
 
   return (
     <div className="flex-1 bg-slate-950 p-4 md:p-6 flex flex-col lg:overflow-hidden">
@@ -41,8 +45,25 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
             ))}
           </div>
 
-          <div className="hidden sm:block text-[8px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800">
-            최신순
+          <div className="flex items-center text-[8px] md:text-[10px] font-bold uppercase tracking-widest bg-slate-900/50 px-1.5 py-1.5 rounded-full border border-slate-800">
+            <button
+              type="button"
+              onClick={() => onSortModeChange('latest')}
+              className={`px-2 py-0.5 rounded-full transition ${
+                isLatest ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-200'
+              }`}
+            >
+              최신순
+            </button>
+            <button
+              type="button"
+              onClick={() => onSortModeChange('score')}
+              className={`px-2 py-0.5 rounded-full transition ${
+                isScore ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-200'
+              }`}
+            >
+              우선순
+            </button>
           </div>
         </div>
       </div>
@@ -84,7 +105,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups }) => {
                 <div className="flex-1 relative overflow-hidden group/list">
                   <div className="absolute inset-0 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
                     <AnimatePresence mode="popLayout">
-                      {group.events.slice(0, 20).map((event, idx) => (
+                      {group.events.slice(0, 30).map((event, idx) => (
                         <motion.div
                           key={event.id}
                           layout

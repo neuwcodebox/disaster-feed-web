@@ -21,7 +21,7 @@ import {
   SOURCE_DISPLAY_ORDER,
   STATUS_SOURCE_LABELS,
 } from './constants';
-import { type CategoryGroup, type DisasterEvent, EventLevels, type SourceStatus } from './types';
+import { type CategoryGroup, type CategorySortMode, type DisasterEvent, EventLevels, type SourceStatus } from './types';
 
 const createInitialSourceStatuses = (): SourceStatus[] => {
   const initial: SourceStatus[] = [];
@@ -38,10 +38,19 @@ const createInitialSourceStatuses = (): SourceStatus[] => {
 };
 
 const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
-const MAX_EVENTS_PER_CATEGORY = 20;
+const MAX_EVENTS_PER_CATEGORY = 50;
 const ALERT_SOUND_WINDOW_MS = 1000;
 const ALERT_SOUND_MIN_LEVEL = EventLevels.Moderate;
 const ALERT_SOUND_LEVELS: EventLevels[] = [EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
+const LEVEL_BASE_SCORES: Record<EventLevels, number> = {
+  [EventLevels.Info]: 10,
+  [EventLevels.Minor]: 20,
+  [EventLevels.Moderate]: 40,
+  [EventLevels.Severe]: 80,
+  [EventLevels.Critical]: 160,
+};
+const SCORE_DECAY_PER_MINUTE = 1;
+const SCORE_RESORT_INTERVAL_MS = 15000;
 
 const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number => {
   if (a.timestamp !== b.timestamp) {
@@ -49,6 +58,22 @@ const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number =
   }
   return b.id.localeCompare(a.id);
 };
+
+const getEventScore = (event: DisasterEvent, nowMs: number): number => {
+  const baseScore = LEVEL_BASE_SCORES[event.level] ?? 0;
+  const elapsedMinutes = Math.max(0, (nowMs - event.timestamp) / 60000);
+  return baseScore - elapsedMinutes * SCORE_DECAY_PER_MINUTE;
+};
+
+const compareEventsByScore =
+  (nowMs: number) =>
+  (a: DisasterEvent, b: DisasterEvent): number => {
+    const scoreDiff = getEventScore(b, nowMs) - getEventScore(a, nowMs);
+    if (scoreDiff !== 0) {
+      return scoreDiff;
+    }
+    return compareEventsByOccurrence(a, b);
+  };
 
 const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): DisasterEvent[] => {
   const counts = new Map<string, number>();
@@ -69,6 +94,8 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
   const [isMuted, setIsMuted] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [categorySortMode, setCategorySortMode] = useState<CategorySortMode>('score');
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastEventIdRef = useRef<string | null>(null);
   const alertSoundsRef = useRef<Partial<Record<EventLevels, HTMLAudioElement>> | null>(null);
@@ -193,6 +220,15 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, SCORE_RESORT_INTERVAL_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
     let isActive = true;
 
     const loadInitialEvents = async () => {
@@ -295,19 +331,21 @@ const App: React.FC = () => {
   }, []);
 
   const sidebarEvents = useMemo(() => {
-    return events
-      .filter((e) => {
-        const priorityMap = {
-          [EventLevels.Info]: 0,
-          [EventLevels.Minor]: 1,
-          [EventLevels.Moderate]: 2,
-          [EventLevels.Severe]: 3,
-          [EventLevels.Critical]: 4,
-        };
-        return priorityMap[e.level] >= priorityMap[SIDEBAR_MIN_LEVEL];
-      })
-      .slice(0, 20);
-  }, [events]);
+    const priorityMap = {
+      [EventLevels.Info]: 0,
+      [EventLevels.Minor]: 1,
+      [EventLevels.Moderate]: 2,
+      [EventLevels.Severe]: 3,
+      [EventLevels.Critical]: 4,
+    };
+    const filtered = events.filter((event) => priorityMap[event.level] >= priorityMap[SIDEBAR_MIN_LEVEL]);
+    if (filtered.length <= 1) {
+      return filtered;
+    }
+    const next = filtered.slice();
+    next.sort(compareEventsByScore(nowMs));
+    return next.slice(0, 30);
+  }, [events, nowMs]);
 
   const categoryGroups = useMemo(() => {
     const groups: Record<string, DisasterEvent[]> = {};
@@ -319,16 +357,22 @@ const App: React.FC = () => {
       groups[event.category].push(event);
     }
 
-    const sortedGroups: CategoryGroup[] = Object.keys(groups).map((cat) => ({
-      category: cat,
-      latestEvent: groups[cat][0],
-      events: groups[cat],
-    }));
+    const sortedGroups: CategoryGroup[] = [];
+    const groupKeys = Object.keys(groups);
+    const eventSorter = categorySortMode === 'score' ? compareEventsByScore(nowMs) : compareEventsByOccurrence;
+    for (let i = 0; i < groupKeys.length; i += 1) {
+      const category = groupKeys[i];
+      const groupEvents = groups[category];
+      groupEvents.sort(eventSorter);
+      sortedGroups.push({
+        category,
+        latestEvent: groupEvents[0],
+        events: groupEvents,
+      });
+    }
 
-    return sortedGroups
-      .sort((a, b) => compareEventsByOccurrence(a.latestEvent, b.latestEvent))
-      .slice(0, MAX_CATEGORIES_DISPLAY);
-  }, [events]);
+    return sortedGroups.sort((a, b) => eventSorter(a.latestEvent, b.latestEvent)).slice(0, MAX_CATEGORIES_DISPLAY);
+  }, [categorySortMode, events, nowMs]);
 
   return (
     // On mobile, we use min-h-screen and allow overflow. On desktop, fixed h-screen.
@@ -341,7 +385,7 @@ const App: React.FC = () => {
 
         {/* Main Grid: Scrollable area */}
         <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col">
-          <CategoryGrid groups={categoryGroups} />
+          <CategoryGrid groups={categoryGroups} sortMode={categorySortMode} onSortModeChange={setCategorySortMode} />
         </div>
       </main>
 
