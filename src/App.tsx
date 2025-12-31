@@ -200,7 +200,7 @@ const App: React.FC = () => {
         const allEventsPromise = fetchInitialEvents();
         const kindPromises: Promise<ApiEvent[]>[] = [];
         for (let i = 0; i < EVENT_KIND_VALUES.length; i += 1) {
-          kindPromises.push(fetchEventsByKind(EVENT_KIND_VALUES[i], 10));
+          kindPromises.push(fetchEventsByKind(EVENT_KIND_VALUES[i], MAX_EVENTS_PER_CATEGORY));
         }
         const [allEvents, kindResults] = await Promise.all([allEventsPromise, Promise.allSettled(kindPromises)]);
         if (!isActive) {
