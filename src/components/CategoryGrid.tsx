@@ -105,7 +105,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortMod
                 <div className="flex-1 relative overflow-hidden group/list">
                   <div className="absolute inset-0 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
                     <AnimatePresence mode="popLayout">
-                      {group.events.slice(0, 30).map((event, idx) => (
+                      {group.events.map((event, idx) => (
                         <motion.div
                           key={event.id}
                           layout
