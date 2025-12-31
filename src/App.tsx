@@ -51,6 +51,7 @@ const LEVEL_BASE_SCORES: Record<EventLevels, number> = {
 };
 const SCORE_DECAY_PER_MINUTE = 1;
 const SCORE_RESORT_INTERVAL_MS = 15000;
+const MAX_EVENT_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
 const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number => {
   if (a.timestamp !== b.timestamp) {
@@ -88,6 +89,21 @@ const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): 
     limited.push(event);
   }
   return limited;
+};
+
+const filterEventsByAge = (items: DisasterEvent[], nowMs: number, maxAgeMs: number): DisasterEvent[] => {
+  if (maxAgeMs <= 0) {
+    return items;
+  }
+  const threshold = nowMs - maxAgeMs;
+  const filtered: DisasterEvent[] = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const event = items[i];
+    if (event.timestamp >= threshold) {
+      filtered.push(event);
+    }
+  }
+  return filtered;
 };
 
 const App: React.FC = () => {
@@ -186,7 +202,8 @@ const App: React.FC = () => {
         }
         const next = [mappedEvent, ...prev];
         next.sort(compareEventsByOccurrence);
-        return limitEventsByCategory(next, MAX_EVENTS_PER_CATEGORY);
+        const recent = filterEventsByAge(next, Date.now(), MAX_EVENT_AGE_MS);
+        return limitEventsByCategory(recent, MAX_EVENTS_PER_CATEGORY);
       });
       setSourceStatuses((prev) => {
         const next = prev.slice();
@@ -266,7 +283,8 @@ const App: React.FC = () => {
         }
         const mapped = Array.from(mappedById.values());
         mapped.sort(compareEventsByOccurrence);
-        setEvents(limitEventsByCategory(mapped, MAX_EVENTS_PER_CATEGORY));
+        const recent = filterEventsByAge(mapped, Date.now(), MAX_EVENT_AGE_MS);
+        setEvents(limitEventsByCategory(recent, MAX_EVENTS_PER_CATEGORY));
         if (mapped.length > 0) {
           lastEventIdRef.current = mapped[0].id;
         }
@@ -330,6 +348,8 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const recentEvents = useMemo(() => filterEventsByAge(events, nowMs, MAX_EVENT_AGE_MS), [events, nowMs]);
+
   const sidebarEvents = useMemo(() => {
     const priorityMap = {
       [EventLevels.Info]: 0,
@@ -338,19 +358,19 @@ const App: React.FC = () => {
       [EventLevels.Severe]: 3,
       [EventLevels.Critical]: 4,
     };
-    const filtered = events.filter((event) => priorityMap[event.level] >= priorityMap[SIDEBAR_MIN_LEVEL]);
+    const filtered = recentEvents.filter((event) => priorityMap[event.level] >= priorityMap[SIDEBAR_MIN_LEVEL]);
     if (filtered.length <= 1) {
       return filtered;
     }
     const next = filtered.slice();
     next.sort(compareEventsByScore(nowMs));
     return next.slice(0, 30);
-  }, [events, nowMs]);
+  }, [nowMs, recentEvents]);
 
   const categoryGroups = useMemo(() => {
     const groups: Record<string, DisasterEvent[]> = {};
-    for (let i = 0; i < events.length; i += 1) {
-      const event = events[i];
+    for (let i = 0; i < recentEvents.length; i += 1) {
+      const event = recentEvents[i];
       if (!groups[event.category]) {
         groups[event.category] = [];
       }
@@ -372,7 +392,7 @@ const App: React.FC = () => {
     }
 
     return sortedGroups.sort((a, b) => eventSorter(a.latestEvent, b.latestEvent)).slice(0, MAX_CATEGORIES_DISPLAY);
-  }, [categorySortMode, events, nowMs]);
+  }, [categorySortMode, nowMs, recentEvents]);
 
   return (
     // On mobile, we use min-h-screen and allow overflow. On desktop, fixed h-screen.
@@ -389,7 +409,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <FooterMarquee events={events.slice(0, 10)} />
+      <FooterMarquee events={recentEvents.slice(0, 10)} />
     </div>
   );
 };
