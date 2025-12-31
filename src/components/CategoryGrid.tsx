@@ -34,9 +34,9 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortMod
           <h2 className="text-lg md:text-xl font-bold text-slate-300">유형별 현황</h2>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex items-center gap-3 justify-between">
           {/* Legend Section - Wrap on very small screens */}
-          <div className="flex items-center space-x-2 md:space-x-3 bg-slate-900/30 px-2 md:px-3 py-1.5 rounded-lg border border-slate-800/50 overflow-x-auto max-w-full">
+          <div className="flex min-w-0 shrink items-center space-x-2 md:space-x-3 bg-slate-900/30 px-2 md:px-3 py-1.5 rounded-lg border border-slate-800/50 overflow-x-auto">
             {levels.map((level) => (
               <div key={level} className="flex items-center space-x-1 whitespace-nowrap">
                 <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${LEVEL_CONFIG[level].bg}`} />
@@ -45,7 +45,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortMod
             ))}
           </div>
 
-          <div className="flex items-center text-[8px] md:text-[10px] font-bold uppercase tracking-widest bg-slate-900/50 px-1.5 py-1.5 rounded-full border border-slate-800">
+          <div className="flex shrink-0 items-center text-[9px] md:text-[10px] font-bold uppercase tracking-widest bg-slate-900/50 px-0.5 py-0.5 md:px-1 md:py-1 rounded-full border border-slate-800">
             <button
               type="button"
               onClick={() => onSortModeChange('latest')}
