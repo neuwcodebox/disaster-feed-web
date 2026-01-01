@@ -11,6 +11,8 @@
 1. 요청 사항 및 AGENTS.md 검토
 2. 요청에 맞는 작업 수행
 3. 타입/린트 오류 검사 및 수정
+  a. `npx tsc --noEmit` 실행
+  b. `npm run lint:fix` 스크립트 실행
 4. 필요한 경우 AGENTS.md 업데이트
 5. 결과 보고 및 커밋 메시지 추천
 
