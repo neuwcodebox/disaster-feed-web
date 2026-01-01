@@ -396,7 +396,7 @@ const App: React.FC = () => {
 
   return (
     // On mobile, we use min-h-screen and allow overflow. On desktop, fixed h-screen.
-    <div className="min-h-screen lg:h-screen w-full flex flex-col bg-slate-950 text-slate-50 border-0 md:border-2 border-slate-900 select-none overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen w-full flex flex-col bg-slate-950 text-slate-50 border-0 md:border-2 border-slate-900 select-none overflow-x-hidden pb-10 md:pb-12 lg:pb-0">
       <Header sourceStatuses={sourceStatuses} isMuted={isMuted} onToggleMute={() => setIsMuted((prev) => !prev)} />
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
