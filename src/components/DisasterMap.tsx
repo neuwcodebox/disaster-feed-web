@@ -6,10 +6,14 @@ import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getEventKindIcon } from '../constants';
-import { type DisasterEvent, EventLevels } from '../types';
+import type { DisasterEvent, EventLevels } from '../types';
 import CapitalInsetMap from './CapitalInsetMap';
-import DisasterMapEmojiMarkers from './DisasterMapEmojiMarkers';
+import DisasterMapEmojiMarkers, {
+  buildRegionCentroids,
+  buildRegionEmojiLabels,
+  collectPointEmojiLabels,
+  projectEmojiMarkers,
+} from './DisasterMapEmojiMarkers';
 import { getRegionFillColor, LEVEL_COLORS, LEVEL_RADII } from './DisasterMapPalette';
 import {
   getPulseColor,
@@ -19,6 +23,7 @@ import {
   PULSE_DURATION_MS,
   REGION_PULSE_DURATION_MS,
 } from './DisasterMapPulse';
+import { normalizeRegionCode, resolveRegionPrefix } from './DisasterMapRegionCodes';
 import type {
   EmojiLabel,
   EmojiMarker,
@@ -50,42 +55,12 @@ type PulseRegionLookup = {
   codes5: Map<string, PulseRegion>;
 };
 
-type RegionKindSummary = {
-  kindLevels: Map<number, EventLevels>;
-  level: EventLevels;
-};
-
-type RegionKindSummaries = {
-  codes2: Map<string, RegionKindSummary>;
-  codes5: Map<string, RegionKindSummary>;
-};
-
-type RegionCentroidIndex = {
-  byCode: Map<string, [number, number]>;
-  byPrefix: Map<string, [number, number]>;
-};
-
-type PolygonCentroid = {
-  position: [number, number];
-  area: number;
-};
-
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const MAP_CENTER: [number, number] = [127.7, 36.7];
-
-const EMOJI_SIZES: Record<EventLevels, number> = {
-  [EventLevels.Info]: 10,
-  [EventLevels.Minor]: 11,
-  [EventLevels.Moderate]: 12,
-  [EventLevels.Severe]: 13,
-  [EventLevels.Critical]: 15,
-};
 
 const PULSE_MAX_POINTS = 12;
 const REGION_PULSE_LINE_WIDTH = 2.2;
 const REGION_PULSE_MAX_AREAS = 10;
-const MAX_EMOJI_PER_LABEL = 8;
-const POINT_CLUSTER_PRECISION = 10000;
 const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
   type: 'FeatureCollection',
   features: [],
@@ -122,25 +97,6 @@ const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseR
   }
   combined.sort((a, b) => a.startedAt - b.startedAt);
   return combined.slice(combined.length - REGION_PULSE_MAX_AREAS);
-};
-
-const normalizeRegionCode = (code: string): string | null => {
-  const digits = code.replace(/\D/g, '');
-  if (!digits) {
-    return null;
-  }
-  if (digits.length >= 10) {
-    return digits.slice(0, 10);
-  }
-  return digits.padEnd(10, '0');
-};
-
-const resolveRegionPrefix = (normalized: string): string => {
-  const sigungu = normalized.slice(2, 5);
-  if (sigungu === '000') {
-    return normalized.slice(0, 2);
-  }
-  return normalized.slice(0, 5);
 };
 
 const collectRegionLevels = (events: DisasterEvent[]): RegionLevels => {
@@ -191,293 +147,6 @@ const collectEventPoints = (events: DisasterEvent[]): MapPoint[] => {
   return points;
 };
 
-const ensureRegionKindSummary = (target: Map<string, RegionKindSummary>, code: string): RegionKindSummary => {
-  const existing = target.get(code);
-  if (existing) {
-    return existing;
-  }
-  const created: RegionKindSummary = {
-    kindLevels: new Map(),
-    level: EventLevels.Info,
-  };
-  target.set(code, created);
-  return created;
-};
-
-const updateKindLevels = (target: Map<number, EventLevels>, kind: number, level: EventLevels) => {
-  const existing = target.get(kind);
-  if (!existing || level > existing) {
-    target.set(kind, level);
-  }
-};
-
-const mergeKindLevels = (target: Map<number, EventLevels>, source: Map<number, EventLevels>) => {
-  for (const [kind, level] of source.entries()) {
-    updateKindLevels(target, kind, level);
-  }
-};
-
-const buildEmojiTokens = (kindLevels: Map<number, EventLevels>, limit: number): string[] => {
-  const entries: { kind: number; level: EventLevels }[] = [];
-  for (const [kind, level] of kindLevels.entries()) {
-    entries.push({ kind, level });
-  }
-  if (entries.length === 0) {
-    return [];
-  }
-  entries.sort((a, b) => {
-    if (a.level !== b.level) {
-      return b.level - a.level;
-    }
-    return a.kind - b.kind;
-  });
-  const icons: string[] = [];
-  const seenIcons = new Set<string>();
-  for (let i = 0; i < entries.length; i += 1) {
-    const icon = getEventKindIcon(entries[i].kind);
-    if (seenIcons.has(icon)) {
-      continue;
-    }
-    seenIcons.add(icon);
-    icons.push(icon);
-  }
-  if (icons.length <= limit) {
-    return icons;
-  }
-  const trimmed = icons.slice(0, limit);
-  trimmed.push(`+${icons.length - limit}`);
-  return trimmed;
-};
-
-const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] => {
-  const clusters = new Map<
-    string,
-    { lngSum: number; latSum: number; count: number; level: EventLevels; kinds: Map<number, EventLevels> }
-  >();
-  for (let i = 0; i < events.length; i += 1) {
-    const event = events[i];
-    if (!event.geo) {
-      continue;
-    }
-    const keyLng = Math.round(event.geo.lng * POINT_CLUSTER_PRECISION);
-    const keyLat = Math.round(event.geo.lat * POINT_CLUSTER_PRECISION);
-    const key = `${keyLng}:${keyLat}`;
-    let cluster = clusters.get(key);
-    if (!cluster) {
-      cluster = {
-        lngSum: 0,
-        latSum: 0,
-        count: 0,
-        level: event.level,
-        kinds: new Map<number, EventLevels>(),
-      };
-      clusters.set(key, cluster);
-    }
-    cluster.lngSum += event.geo.lng;
-    cluster.latSum += event.geo.lat;
-    cluster.count += 1;
-    if (event.level > cluster.level) {
-      cluster.level = event.level;
-    }
-    updateKindLevels(cluster.kinds, event.kind, event.level);
-  }
-  const labels: EmojiLabel[] = [];
-  for (const [key, cluster] of clusters.entries()) {
-    const tokens = buildEmojiTokens(cluster.kinds, MAX_EMOJI_PER_LABEL);
-    if (tokens.length === 0) {
-      continue;
-    }
-    labels.push({
-      id: `point-${key}`,
-      position: [cluster.lngSum / cluster.count, cluster.latSum / cluster.count],
-      level: cluster.level,
-      tokens,
-      size: EMOJI_SIZES[cluster.level] ?? 14,
-    });
-  }
-  return labels;
-};
-
-const collectRegionKindSummaries = (events: DisasterEvent[]): RegionKindSummaries => {
-  const codes2 = new Map<string, RegionKindSummary>();
-  const codes5 = new Map<string, RegionKindSummary>();
-  for (let i = 0; i < events.length; i += 1) {
-    const event = events[i];
-    if (!event.regionCodes) {
-      continue;
-    }
-    for (let j = 0; j < event.regionCodes.length; j += 1) {
-      const normalized = normalizeRegionCode(event.regionCodes[j]);
-      if (!normalized) {
-        continue;
-      }
-      const prefix = resolveRegionPrefix(normalized);
-      const target = prefix.length === 2 ? codes2 : codes5;
-      const summary = ensureRegionKindSummary(target, prefix);
-      if (event.level > summary.level) {
-        summary.level = event.level;
-      }
-      updateKindLevels(summary.kindLevels, event.kind, event.level);
-    }
-  }
-  return { codes2, codes5 };
-};
-
-const getRingCentroid = (ring: number[][]): PolygonCentroid | null => {
-  if (ring.length < 3) {
-    return null;
-  }
-  let areaSum = 0;
-  let cx = 0;
-  let cy = 0;
-  const count = ring.length;
-  for (let i = 0; i < count; i += 1) {
-    const [x0, y0] = ring[i];
-    const [x1, y1] = ring[(i + 1) % count];
-    const cross = x0 * y1 - x1 * y0;
-    areaSum += cross;
-    cx += (x0 + x1) * cross;
-    cy += (y0 + y1) * cross;
-  }
-  if (!Number.isFinite(areaSum) || Math.abs(areaSum) < 1e-8) {
-    let avgX = 0;
-    let avgY = 0;
-    for (let i = 0; i < count; i += 1) {
-      avgX += ring[i][0];
-      avgY += ring[i][1];
-    }
-    return {
-      position: [avgX / count, avgY / count],
-      area: 1,
-    };
-  }
-  const area = areaSum / 2;
-  return {
-    position: [cx / (6 * area), cy / (6 * area)],
-    area: Math.abs(area),
-  };
-};
-
-const getFeatureCentroid = (feature: GeoRegionFeature): PolygonCentroid | null => {
-  const geometry = feature.geometry;
-  if (geometry.type === 'Polygon') {
-    const ring = geometry.coordinates[0];
-    return ring ? getRingCentroid(ring) : null;
-  }
-  if (geometry.type === 'MultiPolygon') {
-    let best: PolygonCentroid | null = null;
-    for (let i = 0; i < geometry.coordinates.length; i += 1) {
-      const ring = geometry.coordinates[i][0];
-      if (!ring) {
-        continue;
-      }
-      const centroid = getRingCentroid(ring);
-      if (!centroid) {
-        continue;
-      }
-      if (!best || centroid.area > best.area) {
-        best = centroid;
-      }
-    }
-    return best;
-  }
-  return null;
-};
-
-const buildRegionCentroids = (regionIndex: GeoRegionIndex | null): RegionCentroidIndex | null => {
-  if (!regionIndex) {
-    return null;
-  }
-  const byCode = new Map<string, [number, number]>();
-  const byCodeArea = new Map<string, number>();
-  for (const [code, feature] of regionIndex.byCode.entries()) {
-    const centroid = getFeatureCentroid(feature);
-    if (!centroid) {
-      continue;
-    }
-    byCode.set(code, centroid.position);
-    byCodeArea.set(code, centroid.area);
-  }
-  const byPrefix = new Map<string, [number, number]>();
-  for (const [prefix, features] of regionIndex.byPrefix.entries()) {
-    let sumLng = 0;
-    let sumLat = 0;
-    let totalArea = 0;
-    for (let i = 0; i < features.length; i += 1) {
-      const code = features[i].properties.SIG_CD;
-      const position = byCode.get(code);
-      const area = byCodeArea.get(code);
-      if (!position || !area) {
-        continue;
-      }
-      sumLng += position[0] * area;
-      sumLat += position[1] * area;
-      totalArea += area;
-    }
-    if (totalArea > 0) {
-      byPrefix.set(prefix, [sumLng / totalArea, sumLat / totalArea]);
-    }
-  }
-  return { byCode, byPrefix };
-};
-
-const buildRegionEmojiLabels = (
-  events: DisasterEvent[],
-  centroids: RegionCentroidIndex | null,
-  regionIndex: GeoRegionIndex | null,
-): EmojiLabel[] => {
-  if (!centroids || !regionIndex) {
-    return [];
-  }
-  const summaries = collectRegionKindSummaries(events);
-  const labels: EmojiLabel[] = [];
-  for (const [code, position] of centroids.byCode.entries()) {
-    const summary5 = summaries.codes5.get(code);
-    const summary2 = summaries.codes2.get(code.slice(0, 2));
-    if (!summary5 && !summary2) {
-      continue;
-    }
-    const mergedKindLevels = new Map<number, EventLevels>();
-    let level = EventLevels.Info;
-    if (summary5) {
-      level = Math.max(level, summary5.level);
-      mergeKindLevels(mergedKindLevels, summary5.kindLevels);
-    }
-    if (summary2) {
-      level = Math.max(level, summary2.level);
-      mergeKindLevels(mergedKindLevels, summary2.kindLevels);
-    }
-    const tokens = buildEmojiTokens(mergedKindLevels, MAX_EMOJI_PER_LABEL);
-    if (tokens.length === 0) {
-      continue;
-    }
-    labels.push({
-      id: `region-${code}`,
-      position,
-      level,
-      tokens,
-      size: EMOJI_SIZES[level] ?? 12,
-    });
-  }
-  return labels;
-};
-
-const projectEmojiMarkers = (labels: EmojiLabel[], map: maplibregl.Map): EmojiMarker[] => {
-  const markers: EmojiMarker[] = [];
-  for (let i = 0; i < labels.length; i += 1) {
-    const label = labels[i];
-    const point = map.project(new maplibregl.LngLat(label.position[0], label.position[1]));
-    markers.push({
-      id: label.id,
-      tokens: label.tokens,
-      x: point.x,
-      y: point.y,
-      size: label.size,
-    });
-  }
-  return markers;
-};
-
 const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen, onClose }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -517,10 +186,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     return { byCode, byPrefix };
   }, [regionData]);
   const regionCentroids = useMemo(() => buildRegionCentroids(regionIndex), [regionIndex]);
-  const regionEmojiLabels = useMemo(
-    () => buildRegionEmojiLabels(events, regionCentroids, regionIndex),
-    [events, regionCentroids, regionIndex],
-  );
+  const regionEmojiLabels = useMemo(() => buildRegionEmojiLabels(events, regionCentroids), [events, regionCentroids]);
   const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(events), [events]);
   const pulseRegionLookup = useMemo<PulseRegionLookup>(() => {
     const codes2 = new Map<string, PulseRegion>();
