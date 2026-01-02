@@ -58,6 +58,11 @@ export enum EventSources {
   YnaNews = 10,
 }
 
+export type EventGeo = {
+  lat: number;
+  lng: number;
+};
+
 export interface DisasterEvent {
   id: string;
   sourceId: number;
@@ -71,6 +76,8 @@ export interface DisasterEvent {
   fetchedAt: string;
   occurredAt: string | null;
   regionText: string | null;
+  geo: EventGeo | null;
+  regionCodes: string[] | null;
   isRealtime: boolean;
 }
 

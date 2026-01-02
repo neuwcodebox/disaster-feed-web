@@ -10,6 +10,7 @@ import {
   toDisasterEvent,
 } from './api';
 import CategoryGrid from './components/CategoryGrid';
+import DisasterMap from './components/DisasterMap';
 import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -407,6 +408,8 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col">
           <CategoryGrid groups={categoryGroups} sortMode={categorySortMode} onSortModeChange={setCategorySortMode} />
         </div>
+
+        <DisasterMap events={recentEvents} />
       </main>
 
       <FooterMarquee events={recentEvents.slice(0, 10)} />

@@ -12,10 +12,14 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.2.5",
+    "@deck.gl/layers": "^9.2.5",
+    "@deck.gl/mapbox": "^9.2.5",
     "@tailwindcss/vite": "^4.1.18",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
+    "maplibre-gl": "^5.15.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tailwindcss": "^4.1.18",

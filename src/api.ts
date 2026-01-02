@@ -4,6 +4,11 @@ import { type DisasterEvent, EventKinds, EventLevels, EventSources, type SourceS
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 
+const schemaGeo = z.object({
+  lat: z.number(),
+  lng: z.number(),
+});
+
 const schemaEvent = z.object({
   id: z.string(),
   source: z.enum(EventSources),
@@ -13,6 +18,8 @@ const schemaEvent = z.object({
   fetchedAt: z.string(),
   occurredAt: z.string().nullable(),
   regionText: z.string().nullable(),
+  geo: schemaGeo.nullable().optional(),
+  regionCodes: z.array(z.string()).nullable().optional(),
   level: z.enum(EventLevels),
 });
 
@@ -174,6 +181,8 @@ export const toDisasterEvent = (event: ApiEvent, isRealtime = false): DisasterEv
     fetchedAt: event.fetchedAt,
     occurredAt: event.occurredAt,
     regionText: event.regionText,
+    geo: event.geo ?? null,
+    regionCodes: event.regionCodes ?? null,
     isRealtime,
   };
 };
