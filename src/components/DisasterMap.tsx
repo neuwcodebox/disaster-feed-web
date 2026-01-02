@@ -57,19 +57,19 @@ const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/sty
 const MAP_CENTER: [number, number] = [127.7, 36.5];
 
 const LEVEL_COLORS: Record<EventLevels, [number, number, number, number]> = {
-  [EventLevels.Info]: [120, 180, 220, 180],
-  [EventLevels.Minor]: [96, 190, 230, 190],
+  [EventLevels.Info]: [160, 170, 180, 180],
+  [EventLevels.Minor]: [70, 130, 230, 200],
   [EventLevels.Moderate]: [232, 210, 128, 210],
-  [EventLevels.Severe]: [240, 170, 104, 220],
+  [EventLevels.Severe]: [248, 140, 70, 220],
   [EventLevels.Critical]: [244, 112, 120, 230],
 };
 
 const LEVEL_RADII: Record<EventLevels, number> = {
-  [EventLevels.Info]: 4,
-  [EventLevels.Minor]: 5,
-  [EventLevels.Moderate]: 6,
-  [EventLevels.Severe]: 7,
-  [EventLevels.Critical]: 8,
+  [EventLevels.Info]: 3,
+  [EventLevels.Minor]: 6,
+  [EventLevels.Moderate]: 9,
+  [EventLevels.Severe]: 16,
+  [EventLevels.Critical]: 24,
 };
 
 const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
