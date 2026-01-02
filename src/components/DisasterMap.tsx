@@ -9,6 +9,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { getEventKindIcon } from '../constants';
 import { type DisasterEvent, EventLevels } from '../types';
 import CapitalInsetMap from './CapitalInsetMap';
+import DisasterMapEmojiMarkers from './DisasterMapEmojiMarkers';
 import { getRegionFillColor, LEVEL_COLORS, LEVEL_RADII } from './DisasterMapPalette';
 import {
   getPulseColor,
@@ -20,6 +21,7 @@ import {
 } from './DisasterMapPulse';
 import type {
   EmojiLabel,
+  EmojiMarker,
   GeoRegionFeature,
   GeoRegionFeatureCollection,
   GeoRegionIndex,
@@ -41,14 +43,6 @@ type MapPoint = {
   position: [number, number];
   level: EventLevels;
   title: string;
-};
-
-type EmojiMarker = {
-  id: string;
-  tokens: string[];
-  x: number;
-  y: number;
-  size: number;
 };
 
 type PulseRegionLookup = {
@@ -77,7 +71,7 @@ type PolygonCentroid = {
 };
 
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const MAP_CENTER: [number, number] = [127.7, 36.5];
+const MAP_CENTER: [number, number] = [127.7, 36.7];
 
 const EMOJI_SIZES: Record<EventLevels, number> = {
   [EventLevels.Info]: 10,
@@ -1024,100 +1018,8 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           pulseNow={pulseNow}
         />
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          {regionEmojiMarkers.map((marker) => {
-            const tokenCount = Math.max(1, marker.tokens.length);
-            const columnCount = Math.ceil(Math.sqrt(tokenCount));
-            const rowCount = Math.ceil(tokenCount / columnCount);
-            const gap = Math.max(1, Math.round(marker.size * 0.1));
-            const width = columnCount * marker.size + (columnCount - 1) * gap;
-            const height = rowCount * marker.size + (rowCount - 1) * gap;
-            return (
-              <span
-                key={marker.id}
-                style={{
-                  position: 'absolute',
-                  left: marker.x,
-                  top: marker.y,
-                  transform: 'translate(-50%, -50%)',
-                  fontSize: `${marker.size}px`,
-                  fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif',
-                  fontWeight: 600,
-                  lineHeight: 1,
-                  color: '#f8fafc',
-                  textShadow: '0 0 6px rgba(6, 10, 18, 0.6), 0 0 10px rgba(6, 10, 18, 0.35)',
-                  zIndex: 10,
-                  display: 'grid',
-                  placeItems: 'center',
-                  gridTemplateColumns: `repeat(${columnCount}, ${marker.size}px)`,
-                  gap: `${gap}px`,
-                  width: `${width}px`,
-                  height: `${height}px`,
-                }}
-              >
-                {marker.tokens.map((token) => (
-                  <span
-                    key={`${marker.id}-${token}`}
-                    style={{
-                      width: `${marker.size}px`,
-                      height: `${marker.size}px`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {token}
-                  </span>
-                ))}
-              </span>
-            );
-          })}
-          {pointEmojiMarkers.map((marker) => {
-            const tokenCount = Math.max(1, marker.tokens.length);
-            const columnCount = Math.ceil(Math.sqrt(tokenCount));
-            const rowCount = Math.ceil(tokenCount / columnCount);
-            const gap = Math.max(1, Math.round(marker.size * 0.1));
-            const width = columnCount * marker.size + (columnCount - 1) * gap;
-            const height = rowCount * marker.size + (rowCount - 1) * gap;
-            return (
-              <span
-                key={marker.id}
-                style={{
-                  position: 'absolute',
-                  left: marker.x,
-                  top: marker.y,
-                  transform: 'translate(-50%, -50%)',
-                  fontSize: `${marker.size}px`,
-                  fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif',
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  color: '#f8fafc',
-                  textShadow: '0 0 6px rgba(6, 10, 18, 0.7), 0 0 12px rgba(6, 10, 18, 0.45)',
-                  zIndex: 20,
-                  display: 'grid',
-                  placeItems: 'center',
-                  gridTemplateColumns: `repeat(${columnCount}, ${marker.size}px)`,
-                  gap: `${gap}px`,
-                  width: `${width}px`,
-                  height: `${height}px`,
-                }}
-              >
-                {marker.tokens.map((token) => (
-                  <span
-                    key={`${marker.id}-${token}`}
-                    style={{
-                      width: `${marker.size}px`,
-                      height: `${marker.size}px`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {token}
-                  </span>
-                ))}
-              </span>
-            );
-          })}
+          <DisasterMapEmojiMarkers markers={regionEmojiMarkers} variant="region" />
+          <DisasterMapEmojiMarkers markers={pointEmojiMarkers} variant="point" />
         </div>
       </div>
     </section>

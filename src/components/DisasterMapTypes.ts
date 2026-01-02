@@ -45,6 +45,14 @@ export type EmojiLabel = {
   size: number;
 };
 
+export type EmojiMarker = {
+  id: string;
+  tokens: string[];
+  x: number;
+  y: number;
+  size: number;
+};
+
 export type PulsePoint = {
   id: string;
   position: [number, number];
