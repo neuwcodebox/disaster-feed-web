@@ -1,7 +1,7 @@
 import type { Layer } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
-import { MapIcon, X } from 'lucide-react';
+import { MapIcon, RotateCcw, X } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -57,6 +57,12 @@ type PulseRegionLookup = {
 
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const MAP_CENTER: [number, number] = [127.7, 36.7];
+const MAP_DEFAULT_VIEW = {
+  center: MAP_CENTER,
+  zoom: 6,
+  pitch: 0,
+  bearing: 0,
+};
 
 const PULSE_MAX_POINTS = 12;
 const REGION_PULSE_LINE_WIDTH = 2.2;
@@ -512,6 +518,14 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     setRegionEmojiMarkers(projectEmojiMarkers(regionEmojiLabelsRef.current, map));
   }, []);
 
+  const handleResetView = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+    map.easeTo({ ...MAP_DEFAULT_VIEW, duration: 700 });
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
       return;
@@ -521,10 +535,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     const map = new maplibregl.Map({
       container,
       style: MAP_STYLE_URL,
-      center: MAP_CENTER,
-      zoom: 6,
-      pitch: 0,
-      bearing: 0,
+      ...MAP_DEFAULT_VIEW,
       attributionControl: false,
     });
 
@@ -630,6 +641,11 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     };
   }, [isLargeScreen, isOpen, onClose]);
 
+  const resetButtonSizeClass = isLargeScreen
+    ? 'gap-1 px-2 py-1 text-[8px] md:text-[10px]'
+    : 'gap-2 px-3 py-1.5 text-xs md:text-sm';
+  const resetIconSizeClass = isLargeScreen ? 'w-3 h-3 md:w-3.5 md:h-3.5' : 'w-3.5 h-3.5 md:w-4 md:h-4';
+
   return (
     <section
       role={isLargeScreen ? undefined : 'dialog'}
@@ -638,26 +654,33 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         isOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'
       }`}
     >
-      <div
-        className={`flex items-center px-4 py-3 bg-slate-950/90 border-b border-slate-900/80 backdrop-blur 2xl:py-5 ${
-          isLargeScreen ? 'justify-start' : 'justify-between'
-        }`}
-      >
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-950/90 border-b border-slate-900/80 backdrop-blur 2xl:py-5">
         <div className="flex items-center gap-2 text-sm md:text-base 2xl:text-xl font-semibold text-slate-300">
           <MapIcon className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
           재난 지도
         </div>
-        {!isLargeScreen && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onClose}
-            aria-label="지도 닫기"
-            className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs md:text-sm text-slate-200 hover:text-white hover:border-slate-500 transition"
+            onClick={handleResetView}
+            aria-label="지도 초기화"
+            className={`inline-flex items-center rounded-full border border-slate-700 bg-slate-900/70 text-slate-200 hover:text-white hover:border-slate-500 transition ${resetButtonSizeClass}`}
           >
-            <X className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            닫기
+            <RotateCcw className={resetIconSizeClass} />
+            <span>초기화</span>
           </button>
-        )}
+          {!isLargeScreen && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="지도 닫기"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs md:text-sm text-slate-200 hover:text-white hover:border-slate-500 transition"
+            >
+              <X className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              닫기
+            </button>
+          )}
+        </div>
       </div>
       <div className="relative flex-1">
         <div ref={containerRef} className="absolute inset-0 h-full" />
