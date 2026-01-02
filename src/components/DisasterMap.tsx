@@ -1,7 +1,7 @@
 import type { Layer } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
-import { X } from 'lucide-react';
+import { MapIcon, X } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -674,20 +674,26 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         isOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'
       }`}
     >
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-950/90 border-b border-slate-900/80 backdrop-blur 2xl:hidden">
-        <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-slate-100">
-          <span className="inline-flex h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+      <div
+        className={`flex items-center px-4 py-3 bg-slate-950/90 border-b border-slate-900/80 backdrop-blur 2xl:py-5 ${
+          isLargeScreen ? 'justify-start' : 'justify-between'
+        }`}
+      >
+        <div className="flex items-center gap-2 text-sm md:text-base 2xl:text-xl font-semibold text-slate-300">
+          <MapIcon className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
           재난 지도
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="지도 닫기"
-          className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs md:text-sm text-slate-200 hover:text-white hover:border-slate-500 transition"
-        >
-          <X className="w-3.5 h-3.5 md:w-4 md:h-4" />
-          닫기
-        </button>
+        {!isLargeScreen && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="지도 닫기"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs md:text-sm text-slate-200 hover:text-white hover:border-slate-500 transition"
+          >
+            <X className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            닫기
+          </button>
+        )}
       </div>
       <div ref={containerRef} className="flex-1" />
     </section>
