@@ -1,3 +1,4 @@
+import { Map as MapIcon } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -42,6 +43,7 @@ const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
 const MAX_EVENTS_PER_CATEGORY = 50;
 const ALERT_SOUND_WINDOW_MS = 1000;
 const ALERT_SOUND_MIN_LEVEL = EventLevels.Moderate;
+const MAP_LARGE_SCREEN_QUERY = '(min-width: 1536px)';
 const ALERT_SOUND_LEVELS: EventLevels[] = [EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
 const LEVEL_BASE_SCORES: Record<EventLevels, number> = {
   [EventLevels.Info]: 10,
@@ -111,6 +113,13 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
   const [isMuted, setIsMuted] = useState(false);
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.matchMedia(MAP_LARGE_SCREEN_QUERY).matches;
+  });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [categorySortMode, setCategorySortMode] = useState<CategorySortMode>('score');
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -135,6 +144,29 @@ const App: React.FC = () => {
       sounds[level] = audio;
     }
     alertSoundsRef.current = sounds;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const mediaQuery = window.matchMedia(MAP_LARGE_SCREEN_QUERY);
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsLargeScreen(event.matches);
+    };
+    setIsLargeScreen(mediaQuery.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  const toggleMap = useCallback(() => {
+    setIsMapOpen((prev) => !prev);
+  }, []);
+
+  const closeMap = useCallback(() => {
+    setIsMapOpen(false);
   }, []);
 
   const playAlertSound = useCallback(
@@ -395,6 +427,8 @@ const App: React.FC = () => {
     return sortedGroups.sort((a, b) => eventSorter(a.latestEvent, b.latestEvent)).slice(0, MAX_CATEGORIES_DISPLAY);
   }, [categorySortMode, nowMs, recentEvents]);
 
+  const isMapVisible = isLargeScreen || isMapOpen;
+
   return (
     // On mobile, we use min-h-screen and allow overflow. On desktop, fixed h-screen.
     <div className="min-h-screen lg:h-screen w-full flex flex-col bg-slate-950 text-slate-50 border-0 md:border-2 border-slate-900 select-none overflow-x-hidden pb-10 md:pb-12 lg:pb-0">
@@ -409,8 +443,19 @@ const App: React.FC = () => {
           <CategoryGrid groups={categoryGroups} sortMode={categorySortMode} onSortModeChange={setCategorySortMode} />
         </div>
 
-        <DisasterMap events={recentEvents} />
+        <DisasterMap events={recentEvents} isOpen={isMapVisible} isLargeScreen={isLargeScreen} onClose={closeMap} />
       </main>
+
+      {!isLargeScreen && !isMapOpen ? (
+        <button
+          type="button"
+          onClick={toggleMap}
+          aria-label="지도 열기"
+          className="fixed right-5 bottom-12 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full border border-blue-400/50 bg-slate-950/90 text-blue-200 shadow-[0_12px_26px_rgba(2,6,23,0.55),0_0_18px_rgba(59,130,246,0.25)] transition hover:text-white hover:border-blue-300 hover:bg-slate-900"
+        >
+          <MapIcon className="w-5 h-5" />
+        </button>
+      ) : null}
 
       <FooterMarquee events={recentEvents.slice(0, 10)} />
     </div>

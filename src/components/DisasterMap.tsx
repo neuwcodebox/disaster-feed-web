@@ -1,5 +1,6 @@
 import { GeoJsonLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
+import { X } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -8,6 +9,9 @@ import { type DisasterEvent, EventLevels } from '../types';
 
 interface DisasterMapProps {
   events: DisasterEvent[];
+  isOpen: boolean;
+  isLargeScreen: boolean;
+  onClose: () => void;
 }
 
 type MapPoint = {
@@ -133,7 +137,7 @@ const collectEventPoints = (events: DisasterEvent[]): MapPoint[] => {
   return points;
 };
 
-const DisasterMap: React.FC<DisasterMapProps> = ({ events }) => {
+const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen, onClose }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
@@ -265,9 +269,52 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events }) => {
     overlay.setProps({ layers });
   }, [layers]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    mapRef.current?.resize();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || isLargeScreen) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isLargeScreen, isOpen, onClose]);
+
   return (
-    <section className="relative w-full aspect-3/4 lg:aspect-auto lg:h-full lg:w-125 shrink-0 border-t border-slate-900/80 lg:border-t-0 lg:border-l bg-slate-950 overflow-hidden">
-      <div ref={containerRef} className="h-full w-full" />
+    <section
+      role={isLargeScreen ? undefined : 'dialog'}
+      aria-hidden={!isOpen}
+      className={`fixed inset-0 z-50 flex flex-col bg-slate-950 border-t border-slate-900/80 transition-[transform,opacity] duration-300 ease-out 2xl:static 2xl:z-auto 2xl:translate-y-0 2xl:opacity-100 2xl:pointer-events-auto 2xl:h-full 2xl:w-100 2xl:shrink-0 2xl:border-t-0 2xl:border-l ${
+        isOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'
+      }`}
+    >
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-950/90 border-b border-slate-900/80 backdrop-blur 2xl:hidden">
+        <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-slate-100">
+          <span className="inline-flex h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+          재난 지도
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="지도 닫기"
+          className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs md:text-sm text-slate-200 hover:text-white hover:border-slate-500 transition"
+        >
+          <X className="w-3.5 h-3.5 md:w-4 md:h-4" />
+          닫기
+        </button>
+      </div>
+      <div ref={containerRef} className="flex-1" />
     </section>
   );
 };
