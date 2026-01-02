@@ -8,6 +8,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getEventKindIcon } from '../constants';
 import { type DisasterEvent, EventLevels } from '../types';
+import CapitalInsetMap from './CapitalInsetMap';
+import { getRegionFillColor, LEVEL_COLORS, LEVEL_RADII } from './DisasterMapPalette';
+import {
+  getPulseColor,
+  getPulseRadius,
+  getRegionPulseFillColor,
+  getRegionPulseLineColor,
+  PULSE_DURATION_MS,
+  REGION_PULSE_DURATION_MS,
+} from './DisasterMapPulse';
+import type {
+  EmojiLabel,
+  GeoRegionFeature,
+  GeoRegionFeatureCollection,
+  GeoRegionIndex,
+  GeoRegionProperties,
+  PulsePoint,
+  PulseRegion,
+  RegionLevels,
+} from './DisasterMapTypes';
 
 interface DisasterMapProps {
   events: DisasterEvent[];
@@ -23,41 +43,12 @@ type MapPoint = {
   title: string;
 };
 
-type EmojiLabel = {
-  id: string;
-  position: [number, number];
-  level: EventLevels;
-  tokens: string[];
-  size: number;
-};
-
 type EmojiMarker = {
   id: string;
   tokens: string[];
   x: number;
   y: number;
   size: number;
-};
-
-type PulsePoint = MapPoint & {
-  startedAt: number;
-};
-
-type PulseRegion = {
-  code: string;
-  level: EventLevels;
-  startedAt: number;
-  isWide: boolean;
-};
-
-type RegionLevels = {
-  codes2: Map<string, EventLevels>;
-  codes5: Map<string, EventLevels>;
-};
-
-type GeoRegionIndex = {
-  byCode: Map<string, GeoRegionFeature>;
-  byPrefix: Map<string, GeoRegionFeature[]>;
 };
 
 type PulseRegionLookup = {
@@ -75,33 +66,6 @@ type RegionKindSummaries = {
   codes5: Map<string, RegionKindSummary>;
 };
 
-type GeoRegionProperties = {
-  SIG_CD: string;
-};
-
-type GeoRegionPolygonGeometry = {
-  type: 'Polygon';
-  coordinates: number[][][];
-};
-
-type GeoRegionMultiPolygonGeometry = {
-  type: 'MultiPolygon';
-  coordinates: number[][][][];
-};
-
-type GeoRegionGeometry = GeoRegionPolygonGeometry | GeoRegionMultiPolygonGeometry;
-
-type GeoRegionFeature = {
-  type: 'Feature';
-  properties: GeoRegionProperties;
-  geometry: GeoRegionGeometry;
-};
-
-type GeoRegionFeatureCollection = {
-  type: 'FeatureCollection';
-  features: GeoRegionFeature[];
-};
-
 type RegionCentroidIndex = {
   byCode: Map<string, [number, number]>;
   byPrefix: Map<string, [number, number]>;
@@ -115,22 +79,6 @@ type PolygonCentroid = {
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const MAP_CENTER: [number, number] = [127.7, 36.5];
 
-const LEVEL_COLORS: Record<EventLevels, [number, number, number, number]> = {
-  [EventLevels.Info]: [160, 170, 180, 180],
-  [EventLevels.Minor]: [70, 130, 230, 200],
-  [EventLevels.Moderate]: [232, 210, 128, 210],
-  [EventLevels.Severe]: [248, 140, 70, 220],
-  [EventLevels.Critical]: [244, 112, 120, 230],
-};
-
-const LEVEL_RADII: Record<EventLevels, number> = {
-  [EventLevels.Info]: 3,
-  [EventLevels.Minor]: 6,
-  [EventLevels.Moderate]: 9,
-  [EventLevels.Severe]: 16,
-  [EventLevels.Critical]: 24,
-};
-
 const EMOJI_SIZES: Record<EventLevels, number> = {
   [EventLevels.Info]: 10,
   [EventLevels.Minor]: 11,
@@ -139,67 +87,14 @@ const EMOJI_SIZES: Record<EventLevels, number> = {
   [EventLevels.Critical]: 15,
 };
 
-const PULSE_DURATION_MS = 2400;
-const PULSE_RADIUS_OFFSET = 8;
-const PULSE_RADIUS_GROWTH = 42;
-const PULSE_MAX_ALPHA = 210;
 const PULSE_MAX_POINTS = 12;
-const REGION_PULSE_DURATION_MS = 2800;
-const REGION_PULSE_MAX_ALPHA = 130;
-const REGION_PULSE_LINE_ALPHA = 210;
 const REGION_PULSE_LINE_WIDTH = 2.2;
 const REGION_PULSE_MAX_AREAS = 10;
-const REGION_FILL_ALPHA = 70;
 const MAX_EMOJI_PER_LABEL = 8;
 const POINT_CLUSTER_PRECISION = 10000;
 const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
   type: 'FeatureCollection',
   features: [],
-};
-
-const easeOutCubic = (value: number): number => 1 - (1 - value) ** 3;
-
-const getPulseProgress = (startedAt: number, now: number, duration: number): number => {
-  if (now <= startedAt) {
-    return 0;
-  }
-  const elapsed = now - startedAt;
-  if (elapsed >= duration) {
-    return 1;
-  }
-  return elapsed / duration;
-};
-
-const getPulseRadius = (point: PulsePoint, now: number): number => {
-  const progress = easeOutCubic(getPulseProgress(point.startedAt, now, PULSE_DURATION_MS));
-  const baseRadius = LEVEL_RADII[point.level] ?? 6;
-  return baseRadius + PULSE_RADIUS_OFFSET + PULSE_RADIUS_GROWTH * progress;
-};
-
-const getPulseColor = (point: PulsePoint, now: number): [number, number, number, number] => {
-  const progress = getPulseProgress(point.startedAt, now, PULSE_DURATION_MS);
-  const [r, g, b] = LEVEL_COLORS[point.level];
-  const alpha = Math.round(PULSE_MAX_ALPHA * (1 - progress));
-  return [r, g, b, alpha];
-};
-
-const getRegionPulseFillColor = (pulse: PulseRegion, now: number): [number, number, number, number] => {
-  const progress = easeOutCubic(getPulseProgress(pulse.startedAt, now, REGION_PULSE_DURATION_MS));
-  const [r, g, b] = LEVEL_COLORS[pulse.level];
-  const alpha = Math.round(REGION_PULSE_MAX_ALPHA * (1 - progress));
-  return [r, g, b, alpha];
-};
-
-const getRegionPulseLineColor = (pulse: PulseRegion, now: number): [number, number, number, number] => {
-  const progress = easeOutCubic(getPulseProgress(pulse.startedAt, now, REGION_PULSE_DURATION_MS));
-  const [r, g, b] = LEVEL_COLORS[pulse.level];
-  const alpha = Math.round(REGION_PULSE_LINE_ALPHA * (1 - progress));
-  return [r, g, b, alpha];
-};
-
-const getRegionFillColor = (level: EventLevels): [number, number, number, number] => {
-  const [r, g, b] = LEVEL_COLORS[level];
-  return [r, g, b, REGION_FILL_ALPHA];
 };
 
 const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
@@ -1118,6 +1013,16 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       </div>
       <div className="relative flex-1">
         <div ref={containerRef} className="absolute inset-0 h-full" />
+        <CapitalInsetMap
+          regionIndex={regionIndex}
+          regionLevels={regionLevels}
+          pointEmojiLabels={pointEmojiLabels}
+          regionEmojiLabels={regionEmojiLabels}
+          isLargeScreen={isLargeScreen}
+          pulsePoints={pulsePoints}
+          pulseRegions={pulseRegions}
+          pulseNow={pulseNow}
+        />
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           {regionEmojiMarkers.map((marker) => {
             const tokenCount = Math.max(1, marker.tokens.length);
