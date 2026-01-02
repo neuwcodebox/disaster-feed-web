@@ -211,6 +211,12 @@ const updateKindLevels = (target: Map<number, EventLevels>, kind: number, level:
   }
 };
 
+const mergeKindLevels = (target: Map<number, EventLevels>, source: Map<number, EventLevels>) => {
+  for (const [kind, level] of source.entries()) {
+    updateKindLevels(target, kind, level);
+  }
+};
+
 const buildEmojiTokens = (kindLevels: Map<number, EventLevels>, limit: number): string[] => {
   const entries: { kind: number; level: EventLevels }[] = [];
   for (const [kind, level] of kindLevels.entries()) {
@@ -425,51 +431,33 @@ const buildRegionEmojiLabels = (
   }
   const summaries = collectRegionKindSummaries(events);
   const labels: EmojiLabel[] = [];
-  const codes5WithLabels = new Set<string>();
-  for (const [code, summary] of summaries.codes5.entries()) {
-    const position = centroids.byCode.get(code);
-    if (!position) {
+  for (const [code, position] of centroids.byCode.entries()) {
+    const summary5 = summaries.codes5.get(code);
+    const summary2 = summaries.codes2.get(code.slice(0, 2));
+    if (!summary5 && !summary2) {
       continue;
     }
-    const tokens = buildEmojiTokens(summary.kindLevels, MAX_EMOJI_PER_LABEL);
+    const mergedKindLevels = new Map<number, EventLevels>();
+    let level = EventLevels.Info;
+    if (summary5) {
+      level = Math.max(level, summary5.level);
+      mergeKindLevels(mergedKindLevels, summary5.kindLevels);
+    }
+    if (summary2) {
+      level = Math.max(level, summary2.level);
+      mergeKindLevels(mergedKindLevels, summary2.kindLevels);
+    }
+    const tokens = buildEmojiTokens(mergedKindLevels, MAX_EMOJI_PER_LABEL);
     if (tokens.length === 0) {
       continue;
     }
     labels.push({
-      id: `region-5-${code}`,
+      id: `region-${code}`,
       position,
-      level: summary.level,
+      level,
       tokens,
-      size: EMOJI_SIZES[summary.level] ?? 12,
+      size: EMOJI_SIZES[level] ?? 12,
     });
-    codes5WithLabels.add(code);
-  }
-  for (const [code, summary] of summaries.codes2.entries()) {
-    const features = regionIndex.byPrefix.get(code);
-    if (!features) {
-      continue;
-    }
-    const tokens = buildEmojiTokens(summary.kindLevels, MAX_EMOJI_PER_LABEL);
-    if (tokens.length === 0) {
-      continue;
-    }
-    for (let i = 0; i < features.length; i += 1) {
-      const regionCode = features[i].properties.SIG_CD;
-      if (codes5WithLabels.has(regionCode)) {
-        continue;
-      }
-      const position = centroids.byCode.get(regionCode);
-      if (!position) {
-        continue;
-      }
-      labels.push({
-        id: `region-2-${code}-${regionCode}`,
-        position,
-        level: summary.level,
-        tokens,
-        size: EMOJI_SIZES[summary.level] ?? 12,
-      });
-    }
   }
   return labels;
 };
