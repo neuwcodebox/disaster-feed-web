@@ -4,8 +4,9 @@ import { MapboxOverlay } from '@deck.gl/mapbox';
 import { MapIcon, X } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
 import type React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { getEventKindIcon } from '../constants';
 import { type DisasterEvent, EventLevels } from '../types';
 
 interface DisasterMapProps {
@@ -20,6 +21,22 @@ type MapPoint = {
   position: [number, number];
   level: EventLevels;
   title: string;
+};
+
+type EmojiLabel = {
+  id: string;
+  position: [number, number];
+  level: EventLevels;
+  tokens: string[];
+  size: number;
+};
+
+type EmojiMarker = {
+  id: string;
+  tokens: string[];
+  x: number;
+  y: number;
+  size: number;
 };
 
 type PulsePoint = MapPoint & {
@@ -46,6 +63,16 @@ type GeoRegionIndex = {
 type PulseRegionLookup = {
   codes2: Map<string, PulseRegion>;
   codes5: Map<string, PulseRegion>;
+};
+
+type RegionKindSummary = {
+  kindLevels: Map<number, EventLevels>;
+  level: EventLevels;
+};
+
+type RegionKindSummaries = {
+  codes2: Map<string, RegionKindSummary>;
+  codes5: Map<string, RegionKindSummary>;
 };
 
 type GeoRegionProperties = {
@@ -75,6 +102,16 @@ type GeoRegionFeatureCollection = {
   features: GeoRegionFeature[];
 };
 
+type RegionCentroidIndex = {
+  byCode: Map<string, [number, number]>;
+  byPrefix: Map<string, [number, number]>;
+};
+
+type PolygonCentroid = {
+  position: [number, number];
+  area: number;
+};
+
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const MAP_CENTER: [number, number] = [127.7, 36.5];
 
@@ -94,6 +131,14 @@ const LEVEL_RADII: Record<EventLevels, number> = {
   [EventLevels.Critical]: 24,
 };
 
+const EMOJI_SIZES: Record<EventLevels, number> = {
+  [EventLevels.Info]: 10,
+  [EventLevels.Minor]: 11,
+  [EventLevels.Moderate]: 12,
+  [EventLevels.Severe]: 13,
+  [EventLevels.Critical]: 15,
+};
+
 const PULSE_DURATION_MS = 2400;
 const PULSE_RADIUS_OFFSET = 8;
 const PULSE_RADIUS_GROWTH = 42;
@@ -105,7 +150,8 @@ const REGION_PULSE_LINE_ALPHA = 210;
 const REGION_PULSE_LINE_WIDTH = 2.2;
 const REGION_PULSE_MAX_AREAS = 10;
 const REGION_FILL_ALPHA = 70;
-
+const MAX_EMOJI_PER_LABEL = 8;
+const POINT_CLUSTER_PRECISION = 10000;
 const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
   type: 'FeatureCollection',
   features: [],
@@ -256,6 +302,305 @@ const collectEventPoints = (events: DisasterEvent[]): MapPoint[] => {
   return points;
 };
 
+const ensureRegionKindSummary = (target: Map<string, RegionKindSummary>, code: string): RegionKindSummary => {
+  const existing = target.get(code);
+  if (existing) {
+    return existing;
+  }
+  const created: RegionKindSummary = {
+    kindLevels: new Map(),
+    level: EventLevels.Info,
+  };
+  target.set(code, created);
+  return created;
+};
+
+const updateKindLevels = (target: Map<number, EventLevels>, kind: number, level: EventLevels) => {
+  const existing = target.get(kind);
+  if (!existing || level > existing) {
+    target.set(kind, level);
+  }
+};
+
+const buildEmojiTokens = (kindLevels: Map<number, EventLevels>, limit: number): string[] => {
+  const entries: { kind: number; level: EventLevels }[] = [];
+  for (const [kind, level] of kindLevels.entries()) {
+    entries.push({ kind, level });
+  }
+  if (entries.length === 0) {
+    return [];
+  }
+  entries.sort((a, b) => {
+    if (a.level !== b.level) {
+      return b.level - a.level;
+    }
+    return a.kind - b.kind;
+  });
+  const icons: string[] = [];
+  const seenIcons = new Set<string>();
+  for (let i = 0; i < entries.length; i += 1) {
+    const icon = getEventKindIcon(entries[i].kind);
+    if (seenIcons.has(icon)) {
+      continue;
+    }
+    seenIcons.add(icon);
+    icons.push(icon);
+  }
+  if (icons.length <= limit) {
+    return icons;
+  }
+  const trimmed = icons.slice(0, limit);
+  trimmed.push(`+${icons.length - limit}`);
+  return trimmed;
+};
+
+const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] => {
+  const clusters = new Map<
+    string,
+    { lngSum: number; latSum: number; count: number; level: EventLevels; kinds: Map<number, EventLevels> }
+  >();
+  for (let i = 0; i < events.length; i += 1) {
+    const event = events[i];
+    if (!event.geo) {
+      continue;
+    }
+    const keyLng = Math.round(event.geo.lng * POINT_CLUSTER_PRECISION);
+    const keyLat = Math.round(event.geo.lat * POINT_CLUSTER_PRECISION);
+    const key = `${keyLng}:${keyLat}`;
+    let cluster = clusters.get(key);
+    if (!cluster) {
+      cluster = {
+        lngSum: 0,
+        latSum: 0,
+        count: 0,
+        level: event.level,
+        kinds: new Map<number, EventLevels>(),
+      };
+      clusters.set(key, cluster);
+    }
+    cluster.lngSum += event.geo.lng;
+    cluster.latSum += event.geo.lat;
+    cluster.count += 1;
+    if (event.level > cluster.level) {
+      cluster.level = event.level;
+    }
+    updateKindLevels(cluster.kinds, event.kind, event.level);
+  }
+  const labels: EmojiLabel[] = [];
+  for (const [key, cluster] of clusters.entries()) {
+    const tokens = buildEmojiTokens(cluster.kinds, MAX_EMOJI_PER_LABEL);
+    if (tokens.length === 0) {
+      continue;
+    }
+    labels.push({
+      id: `point-${key}`,
+      position: [cluster.lngSum / cluster.count, cluster.latSum / cluster.count],
+      level: cluster.level,
+      tokens,
+      size: EMOJI_SIZES[cluster.level] ?? 14,
+    });
+  }
+  return labels;
+};
+
+const collectRegionKindSummaries = (events: DisasterEvent[]): RegionKindSummaries => {
+  const codes2 = new Map<string, RegionKindSummary>();
+  const codes5 = new Map<string, RegionKindSummary>();
+  for (let i = 0; i < events.length; i += 1) {
+    const event = events[i];
+    if (!event.regionCodes) {
+      continue;
+    }
+    for (let j = 0; j < event.regionCodes.length; j += 1) {
+      const normalized = normalizeRegionCode(event.regionCodes[j]);
+      if (!normalized) {
+        continue;
+      }
+      const prefix = resolveRegionPrefix(normalized);
+      const target = prefix.length === 2 ? codes2 : codes5;
+      const summary = ensureRegionKindSummary(target, prefix);
+      if (event.level > summary.level) {
+        summary.level = event.level;
+      }
+      updateKindLevels(summary.kindLevels, event.kind, event.level);
+    }
+  }
+  return { codes2, codes5 };
+};
+
+const getRingCentroid = (ring: number[][]): PolygonCentroid | null => {
+  if (ring.length < 3) {
+    return null;
+  }
+  let areaSum = 0;
+  let cx = 0;
+  let cy = 0;
+  const count = ring.length;
+  for (let i = 0; i < count; i += 1) {
+    const [x0, y0] = ring[i];
+    const [x1, y1] = ring[(i + 1) % count];
+    const cross = x0 * y1 - x1 * y0;
+    areaSum += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
+  }
+  if (!Number.isFinite(areaSum) || Math.abs(areaSum) < 1e-8) {
+    let avgX = 0;
+    let avgY = 0;
+    for (let i = 0; i < count; i += 1) {
+      avgX += ring[i][0];
+      avgY += ring[i][1];
+    }
+    return {
+      position: [avgX / count, avgY / count],
+      area: 1,
+    };
+  }
+  const area = areaSum / 2;
+  return {
+    position: [cx / (6 * area), cy / (6 * area)],
+    area: Math.abs(area),
+  };
+};
+
+const getFeatureCentroid = (feature: GeoRegionFeature): PolygonCentroid | null => {
+  const geometry = feature.geometry;
+  if (geometry.type === 'Polygon') {
+    const ring = geometry.coordinates[0];
+    return ring ? getRingCentroid(ring) : null;
+  }
+  if (geometry.type === 'MultiPolygon') {
+    let best: PolygonCentroid | null = null;
+    for (let i = 0; i < geometry.coordinates.length; i += 1) {
+      const ring = geometry.coordinates[i][0];
+      if (!ring) {
+        continue;
+      }
+      const centroid = getRingCentroid(ring);
+      if (!centroid) {
+        continue;
+      }
+      if (!best || centroid.area > best.area) {
+        best = centroid;
+      }
+    }
+    return best;
+  }
+  return null;
+};
+
+const buildRegionCentroids = (regionIndex: GeoRegionIndex | null): RegionCentroidIndex | null => {
+  if (!regionIndex) {
+    return null;
+  }
+  const byCode = new Map<string, [number, number]>();
+  const byCodeArea = new Map<string, number>();
+  for (const [code, feature] of regionIndex.byCode.entries()) {
+    const centroid = getFeatureCentroid(feature);
+    if (!centroid) {
+      continue;
+    }
+    byCode.set(code, centroid.position);
+    byCodeArea.set(code, centroid.area);
+  }
+  const byPrefix = new Map<string, [number, number]>();
+  for (const [prefix, features] of regionIndex.byPrefix.entries()) {
+    let sumLng = 0;
+    let sumLat = 0;
+    let totalArea = 0;
+    for (let i = 0; i < features.length; i += 1) {
+      const code = features[i].properties.SIG_CD;
+      const position = byCode.get(code);
+      const area = byCodeArea.get(code);
+      if (!position || !area) {
+        continue;
+      }
+      sumLng += position[0] * area;
+      sumLat += position[1] * area;
+      totalArea += area;
+    }
+    if (totalArea > 0) {
+      byPrefix.set(prefix, [sumLng / totalArea, sumLat / totalArea]);
+    }
+  }
+  return { byCode, byPrefix };
+};
+
+const buildRegionEmojiLabels = (
+  events: DisasterEvent[],
+  centroids: RegionCentroidIndex | null,
+  regionIndex: GeoRegionIndex | null,
+): EmojiLabel[] => {
+  if (!centroids || !regionIndex) {
+    return [];
+  }
+  const summaries = collectRegionKindSummaries(events);
+  const labels: EmojiLabel[] = [];
+  const codes5WithLabels = new Set<string>();
+  for (const [code, summary] of summaries.codes5.entries()) {
+    const position = centroids.byCode.get(code);
+    if (!position) {
+      continue;
+    }
+    const tokens = buildEmojiTokens(summary.kindLevels, MAX_EMOJI_PER_LABEL);
+    if (tokens.length === 0) {
+      continue;
+    }
+    labels.push({
+      id: `region-5-${code}`,
+      position,
+      level: summary.level,
+      tokens,
+      size: EMOJI_SIZES[summary.level] ?? 12,
+    });
+    codes5WithLabels.add(code);
+  }
+  for (const [code, summary] of summaries.codes2.entries()) {
+    const features = regionIndex.byPrefix.get(code);
+    if (!features) {
+      continue;
+    }
+    const tokens = buildEmojiTokens(summary.kindLevels, MAX_EMOJI_PER_LABEL);
+    if (tokens.length === 0) {
+      continue;
+    }
+    for (let i = 0; i < features.length; i += 1) {
+      const regionCode = features[i].properties.SIG_CD;
+      if (codes5WithLabels.has(regionCode)) {
+        continue;
+      }
+      const position = centroids.byCode.get(regionCode);
+      if (!position) {
+        continue;
+      }
+      labels.push({
+        id: `region-2-${code}-${regionCode}`,
+        position,
+        level: summary.level,
+        tokens,
+        size: EMOJI_SIZES[summary.level] ?? 12,
+      });
+    }
+  }
+  return labels;
+};
+
+const projectEmojiMarkers = (labels: EmojiLabel[], map: maplibregl.Map): EmojiMarker[] => {
+  const markers: EmojiMarker[] = [];
+  for (let i = 0; i < labels.length; i += 1) {
+    const label = labels[i];
+    const point = map.project(new maplibregl.LngLat(label.position[0], label.position[1]));
+    markers.push({
+      id: label.id,
+      tokens: label.tokens,
+      x: point.x,
+      y: point.y,
+      size: label.size,
+    });
+  }
+  return markers;
+};
+
 const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen, onClose }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -264,8 +609,12 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const [pulsePoints, setPulsePoints] = useState<PulsePoint[]>([]);
   const [pulseRegions, setPulseRegions] = useState<PulseRegion[]>([]);
   const [pulseNow, setPulseNow] = useState(0);
+  const [pointEmojiMarkers, setPointEmojiMarkers] = useState<EmojiMarker[]>([]);
+  const [regionEmojiMarkers, setRegionEmojiMarkers] = useState<EmojiMarker[]>([]);
   const knownEventIdsRef = useRef<Set<string>>(new Set());
   const hasSeededEventsRef = useRef(false);
+  const pointEmojiLabelsRef = useRef<EmojiLabel[]>([]);
+  const regionEmojiLabelsRef = useRef<EmojiLabel[]>([]);
 
   const regionLevels = useMemo(() => collectRegionLevels(events), [events]);
   const eventPoints = useMemo(() => collectEventPoints(events), [events]);
@@ -290,6 +639,12 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     }
     return { byCode, byPrefix };
   }, [regionData]);
+  const regionCentroids = useMemo(() => buildRegionCentroids(regionIndex), [regionIndex]);
+  const regionEmojiLabels = useMemo(
+    () => buildRegionEmojiLabels(events, regionCentroids, regionIndex),
+    [events, regionCentroids, regionIndex],
+  );
+  const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(events), [events]);
   const pulseRegionLookup = useMemo<PulseRegionLookup>(() => {
     const codes2 = new Map<string, PulseRegion>();
     const codes5 = new Map<string, PulseRegion>();
@@ -603,6 +958,17 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     regionLevels,
   ]);
 
+  const updateEmojiMarkers = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) {
+      setPointEmojiMarkers([]);
+      setRegionEmojiMarkers([]);
+      return;
+    }
+    setPointEmojiMarkers(projectEmojiMarkers(pointEmojiLabelsRef.current, map));
+    setRegionEmojiMarkers(projectEmojiMarkers(regionEmojiLabelsRef.current, map));
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
       return;
@@ -639,6 +1005,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         }
       }
       map.resize();
+      updateEmojiMarkers();
     });
 
     const resizeObserver = new ResizeObserver(() => {
@@ -652,7 +1019,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       mapRef.current = null;
       overlayRef.current = null;
     };
-  }, []);
+  }, [updateEmojiMarkers]);
 
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -661,6 +1028,42 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     }
     overlay.setProps({ layers });
   }, [layers]);
+
+  useEffect(() => {
+    pointEmojiLabelsRef.current = pointEmojiLabels;
+    regionEmojiLabelsRef.current = regionEmojiLabels;
+    updateEmojiMarkers();
+  }, [pointEmojiLabels, regionEmojiLabels, updateEmojiMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+    let frameId = 0;
+
+    const scheduleUpdate = () => {
+      if (frameId) {
+        return;
+      }
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        updateEmojiMarkers();
+      });
+    };
+
+    map.on('move', scheduleUpdate);
+    map.on('resize', scheduleUpdate);
+    scheduleUpdate();
+
+    return () => {
+      map.off('move', scheduleUpdate);
+      map.off('resize', scheduleUpdate);
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [updateEmojiMarkers]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -713,7 +1116,105 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           </button>
         )}
       </div>
-      <div ref={containerRef} className="flex-1" />
+      <div className="relative flex-1">
+        <div ref={containerRef} className="absolute inset-0 h-full" />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {regionEmojiMarkers.map((marker) => {
+            const tokenCount = Math.max(1, marker.tokens.length);
+            const columnCount = Math.ceil(Math.sqrt(tokenCount));
+            const rowCount = Math.ceil(tokenCount / columnCount);
+            const gap = Math.max(1, Math.round(marker.size * 0.1));
+            const width = columnCount * marker.size + (columnCount - 1) * gap;
+            const height = rowCount * marker.size + (rowCount - 1) * gap;
+            return (
+              <span
+                key={marker.id}
+                style={{
+                  position: 'absolute',
+                  left: marker.x,
+                  top: marker.y,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: `${marker.size}px`,
+                  fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif',
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  color: '#f8fafc',
+                  textShadow: '0 0 6px rgba(6, 10, 18, 0.6), 0 0 10px rgba(6, 10, 18, 0.35)',
+                  zIndex: 10,
+                  display: 'grid',
+                  placeItems: 'center',
+                  gridTemplateColumns: `repeat(${columnCount}, ${marker.size}px)`,
+                  gap: `${gap}px`,
+                  width: `${width}px`,
+                  height: `${height}px`,
+                }}
+              >
+                {marker.tokens.map((token) => (
+                  <span
+                    key={`${marker.id}-${token}`}
+                    style={{
+                      width: `${marker.size}px`,
+                      height: `${marker.size}px`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {token}
+                  </span>
+                ))}
+              </span>
+            );
+          })}
+          {pointEmojiMarkers.map((marker) => {
+            const tokenCount = Math.max(1, marker.tokens.length);
+            const columnCount = Math.ceil(Math.sqrt(tokenCount));
+            const rowCount = Math.ceil(tokenCount / columnCount);
+            const gap = Math.max(1, Math.round(marker.size * 0.1));
+            const width = columnCount * marker.size + (columnCount - 1) * gap;
+            const height = rowCount * marker.size + (rowCount - 1) * gap;
+            return (
+              <span
+                key={marker.id}
+                style={{
+                  position: 'absolute',
+                  left: marker.x,
+                  top: marker.y,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: `${marker.size}px`,
+                  fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif',
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  color: '#f8fafc',
+                  textShadow: '0 0 6px rgba(6, 10, 18, 0.7), 0 0 12px rgba(6, 10, 18, 0.45)',
+                  zIndex: 20,
+                  display: 'grid',
+                  placeItems: 'center',
+                  gridTemplateColumns: `repeat(${columnCount}, ${marker.size}px)`,
+                  gap: `${gap}px`,
+                  width: `${width}px`,
+                  height: `${height}px`,
+                }}
+              >
+                {marker.tokens.map((token) => (
+                  <span
+                    key={`${marker.id}-${token}`}
+                    style={{
+                      width: `${marker.size}px`,
+                      height: `${marker.size}px`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {token}
+                  </span>
+                ))}
+              </span>
+            );
+          })}
+        </div>
+      </div>
     </section>
   );
 };
