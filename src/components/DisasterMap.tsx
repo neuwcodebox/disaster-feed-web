@@ -33,9 +33,9 @@ type PulseRegion = {
   isWide: boolean;
 };
 
-type RegionTargets = {
-  codes2: Set<string>;
-  codes5: Set<string>;
+type RegionLevels = {
+  codes2: Map<string, EventLevels>;
+  codes5: Map<string, EventLevels>;
 };
 
 type GeoRegionIndex = {
@@ -104,6 +104,7 @@ const REGION_PULSE_MAX_ALPHA = 130;
 const REGION_PULSE_LINE_ALPHA = 210;
 const REGION_PULSE_LINE_WIDTH = 2.2;
 const REGION_PULSE_MAX_AREAS = 10;
+const REGION_FILL_ALPHA = 70;
 
 const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
   type: 'FeatureCollection',
@@ -148,6 +149,11 @@ const getRegionPulseLineColor = (pulse: PulseRegion, now: number): [number, numb
   const [r, g, b] = LEVEL_COLORS[pulse.level];
   const alpha = Math.round(REGION_PULSE_LINE_ALPHA * (1 - progress));
   return [r, g, b, alpha];
+};
+
+const getRegionFillColor = (level: EventLevels): [number, number, number, number] => {
+  const [r, g, b] = LEVEL_COLORS[level];
+  return [r, g, b, REGION_FILL_ALPHA];
 };
 
 const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
@@ -202,11 +208,12 @@ const resolveRegionPrefix = (normalized: string): string => {
   return normalized.slice(0, 5);
 };
 
-const collectRegionTargets = (events: DisasterEvent[]): RegionTargets => {
-  const codes2 = new Set<string>();
-  const codes5 = new Set<string>();
+const collectRegionLevels = (events: DisasterEvent[]): RegionLevels => {
+  const codes2 = new Map<string, EventLevels>();
+  const codes5 = new Map<string, EventLevels>();
   for (let i = 0; i < events.length; i += 1) {
     const regionCodes = events[i].regionCodes;
+    const level = events[i].level;
     if (!regionCodes) {
       continue;
     }
@@ -217,9 +224,15 @@ const collectRegionTargets = (events: DisasterEvent[]): RegionTargets => {
       }
       const prefix = resolveRegionPrefix(normalized);
       if (prefix.length === 2) {
-        codes2.add(prefix);
+        const existing = codes2.get(prefix);
+        if (!existing || level > existing) {
+          codes2.set(prefix, level);
+        }
       } else {
-        codes5.add(prefix);
+        const existing = codes5.get(prefix);
+        if (!existing || level > existing) {
+          codes5.set(prefix, level);
+        }
       }
     }
   }
@@ -254,7 +267,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const knownEventIdsRef = useRef<Set<string>>(new Set());
   const hasSeededEventsRef = useRef(false);
 
-  const regionTargets = useMemo(() => collectRegionTargets(events), [events]);
+  const regionLevels = useMemo(() => collectRegionLevels(events), [events]);
   const eventPoints = useMemo(() => collectEventPoints(events), [events]);
   const regionIndex = useMemo<GeoRegionIndex | null>(() => {
     if (!regionData) {
@@ -486,14 +499,19 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       getLineColor: [110, 130, 150, 90],
       getFillColor: (feature) => {
         const code = feature.properties.SIG_CD;
-        const isActive = regionTargets.codes5.has(code) || regionTargets.codes2.has(code.slice(0, 2));
-        if (isActive) {
-          return [86, 142, 191, 70];
+        const level5 = regionLevels.codes5.get(code);
+        const level2 = regionLevels.codes2.get(code.slice(0, 2));
+        let level = level5 ?? level2;
+        if (level5 !== undefined && level2 !== undefined) {
+          level = Math.max(level5, level2);
+        }
+        if (level) {
+          return getRegionFillColor(level);
         }
         return [12, 18, 28, 40];
       },
       updateTriggers: {
-        getFillColor: [regionTargets],
+        getFillColor: [regionLevels],
       },
     });
 
@@ -582,7 +600,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     pulseRegionLookup,
     pulseRegions,
     regionData,
-    regionTargets,
+    regionLevels,
   ]);
 
   useEffect(() => {
