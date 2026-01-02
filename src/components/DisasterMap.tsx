@@ -1,3 +1,4 @@
+import type { Layer } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { X } from 'lucide-react';
@@ -21,9 +22,30 @@ type MapPoint = {
   title: string;
 };
 
+type PulsePoint = MapPoint & {
+  startedAt: number;
+};
+
+type PulseRegion = {
+  code: string;
+  level: EventLevels;
+  startedAt: number;
+  isWide: boolean;
+};
+
 type RegionTargets = {
   codes2: Set<string>;
   codes5: Set<string>;
+};
+
+type GeoRegionIndex = {
+  byCode: Map<string, GeoRegionFeature>;
+  byPrefix: Map<string, GeoRegionFeature[]>;
+};
+
+type PulseRegionLookup = {
+  codes2: Map<string, PulseRegion>;
+  codes5: Map<string, PulseRegion>;
 };
 
 type GeoRegionProperties = {
@@ -72,9 +94,93 @@ const LEVEL_RADII: Record<EventLevels, number> = {
   [EventLevels.Critical]: 24,
 };
 
+const PULSE_DURATION_MS = 2400;
+const PULSE_RADIUS_OFFSET = 8;
+const PULSE_RADIUS_GROWTH = 42;
+const PULSE_MAX_ALPHA = 210;
+const PULSE_MAX_POINTS = 12;
+const REGION_PULSE_DURATION_MS = 2800;
+const REGION_PULSE_MAX_ALPHA = 130;
+const REGION_PULSE_LINE_ALPHA = 210;
+const REGION_PULSE_LINE_WIDTH = 2.2;
+const REGION_PULSE_MAX_AREAS = 10;
+
 const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
   type: 'FeatureCollection',
   features: [],
+};
+
+const easeOutCubic = (value: number): number => 1 - (1 - value) ** 3;
+
+const getPulseProgress = (startedAt: number, now: number, duration: number): number => {
+  if (now <= startedAt) {
+    return 0;
+  }
+  const elapsed = now - startedAt;
+  if (elapsed >= duration) {
+    return 1;
+  }
+  return elapsed / duration;
+};
+
+const getPulseRadius = (point: PulsePoint, now: number): number => {
+  const progress = easeOutCubic(getPulseProgress(point.startedAt, now, PULSE_DURATION_MS));
+  const baseRadius = LEVEL_RADII[point.level] ?? 6;
+  return baseRadius + PULSE_RADIUS_OFFSET + PULSE_RADIUS_GROWTH * progress;
+};
+
+const getPulseColor = (point: PulsePoint, now: number): [number, number, number, number] => {
+  const progress = getPulseProgress(point.startedAt, now, PULSE_DURATION_MS);
+  const [r, g, b] = LEVEL_COLORS[point.level];
+  const alpha = Math.round(PULSE_MAX_ALPHA * (1 - progress));
+  return [r, g, b, alpha];
+};
+
+const getRegionPulseFillColor = (pulse: PulseRegion, now: number): [number, number, number, number] => {
+  const progress = easeOutCubic(getPulseProgress(pulse.startedAt, now, REGION_PULSE_DURATION_MS));
+  const [r, g, b] = LEVEL_COLORS[pulse.level];
+  const alpha = Math.round(REGION_PULSE_MAX_ALPHA * (1 - progress));
+  return [r, g, b, alpha];
+};
+
+const getRegionPulseLineColor = (pulse: PulseRegion, now: number): [number, number, number, number] => {
+  const progress = easeOutCubic(getPulseProgress(pulse.startedAt, now, REGION_PULSE_DURATION_MS));
+  const [r, g, b] = LEVEL_COLORS[pulse.level];
+  const alpha = Math.round(REGION_PULSE_LINE_ALPHA * (1 - progress));
+  return [r, g, b, alpha];
+};
+
+const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
+  if (incoming.length === 0) {
+    return prev;
+  }
+  const merged = new Map<string, PulseRegion>();
+  for (let i = 0; i < prev.length; i += 1) {
+    const pulse = prev[i];
+    const key = `${pulse.isWide ? '2' : '5'}-${pulse.code}`;
+    merged.set(key, pulse);
+  }
+  for (let i = 0; i < incoming.length; i += 1) {
+    const pulse = incoming[i];
+    const key = `${pulse.isWide ? '2' : '5'}-${pulse.code}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, pulse);
+      continue;
+    }
+    const level = Math.max(existing.level, pulse.level);
+    const startedAt = Math.max(existing.startedAt, pulse.startedAt);
+    merged.set(key, { ...pulse, level, startedAt });
+  }
+  const combined: PulseRegion[] = [];
+  for (const value of merged.values()) {
+    combined.push(value);
+  }
+  if (combined.length <= REGION_PULSE_MAX_AREAS) {
+    return combined;
+  }
+  combined.sort((a, b) => a.startedAt - b.startedAt);
+  return combined.slice(combined.length - REGION_PULSE_MAX_AREAS);
 };
 
 const normalizeRegionCode = (code: string): string | null => {
@@ -142,9 +248,206 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const mapRef = useRef<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const [regionData, setRegionData] = useState<GeoRegionFeatureCollection | null>(null);
+  const [pulsePoints, setPulsePoints] = useState<PulsePoint[]>([]);
+  const [pulseRegions, setPulseRegions] = useState<PulseRegion[]>([]);
+  const [pulseNow, setPulseNow] = useState(0);
+  const knownEventIdsRef = useRef<Set<string>>(new Set());
+  const hasSeededEventsRef = useRef(false);
 
   const regionTargets = useMemo(() => collectRegionTargets(events), [events]);
   const eventPoints = useMemo(() => collectEventPoints(events), [events]);
+  const regionIndex = useMemo<GeoRegionIndex | null>(() => {
+    if (!regionData) {
+      return null;
+    }
+    const byCode = new Map<string, GeoRegionFeature>();
+    const byPrefix = new Map<string, GeoRegionFeature[]>();
+    const features = regionData.features;
+    for (let i = 0; i < features.length; i += 1) {
+      const feature = features[i];
+      const code = feature.properties.SIG_CD;
+      byCode.set(code, feature);
+      const prefix = code.slice(0, 2);
+      const list = byPrefix.get(prefix);
+      if (list) {
+        list.push(feature);
+      } else {
+        byPrefix.set(prefix, [feature]);
+      }
+    }
+    return { byCode, byPrefix };
+  }, [regionData]);
+  const pulseRegionLookup = useMemo<PulseRegionLookup>(() => {
+    const codes2 = new Map<string, PulseRegion>();
+    const codes5 = new Map<string, PulseRegion>();
+    for (let i = 0; i < pulseRegions.length; i += 1) {
+      const pulse = pulseRegions[i];
+      if (pulse.isWide) {
+        codes2.set(pulse.code, pulse);
+      } else {
+        codes5.set(pulse.code, pulse);
+      }
+    }
+    return { codes2, codes5 };
+  }, [pulseRegions]);
+  const pulseRegionFeatures = useMemo<GeoRegionFeature[]>(() => {
+    if (!regionIndex || pulseRegions.length === 0) {
+      return [];
+    }
+    const features: GeoRegionFeature[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < pulseRegions.length; i += 1) {
+      const pulse = pulseRegions[i];
+      if (pulse.isWide) {
+        const list = regionIndex.byPrefix.get(pulse.code);
+        if (!list) {
+          continue;
+        }
+        for (let j = 0; j < list.length; j += 1) {
+          const feature = list[j];
+          const code = feature.properties.SIG_CD;
+          if (seen.has(code)) {
+            continue;
+          }
+          seen.add(code);
+          features.push(feature);
+        }
+      } else {
+        const feature = regionIndex.byCode.get(pulse.code);
+        if (!feature) {
+          continue;
+        }
+        const code = feature.properties.SIG_CD;
+        if (!seen.has(code)) {
+          seen.add(code);
+          features.push(feature);
+        }
+      }
+    }
+    return features;
+  }, [pulseRegions, regionIndex]);
+
+  useEffect(() => {
+    const nextIds = new Set<string>();
+    const nextPulses: PulsePoint[] = [];
+    const nextRegionPulses: PulseRegion[] = [];
+    const now = Date.now();
+
+    for (let i = 0; i < events.length; i += 1) {
+      const event = events[i];
+      nextIds.add(event.id);
+      if (knownEventIdsRef.current.has(event.id)) {
+        continue;
+      }
+      if (!event.isRealtime) {
+        continue;
+      }
+      if (event.geo) {
+        nextPulses.push({
+          id: event.id,
+          position: [event.geo.lng, event.geo.lat],
+          level: event.level,
+          title: event.title,
+          startedAt: now,
+        });
+      }
+      if (event.regionCodes) {
+        for (let j = 0; j < event.regionCodes.length; j += 1) {
+          const normalized = normalizeRegionCode(event.regionCodes[j]);
+          if (!normalized) {
+            continue;
+          }
+          const prefix = resolveRegionPrefix(normalized);
+          nextRegionPulses.push({
+            code: prefix,
+            level: event.level,
+            startedAt: now,
+            isWide: prefix.length === 2,
+          });
+        }
+      }
+    }
+
+    if (!hasSeededEventsRef.current) {
+      knownEventIdsRef.current = nextIds;
+      hasSeededEventsRef.current = true;
+      return;
+    }
+
+    knownEventIdsRef.current = nextIds;
+
+    const hasPointPulses = nextPulses.length > 0;
+    const hasRegionPulses = nextRegionPulses.length > 0;
+
+    if (hasPointPulses) {
+      setPulsePoints((prev) => {
+        const merged = [...prev, ...nextPulses];
+        if (merged.length <= PULSE_MAX_POINTS) {
+          return merged;
+        }
+        return merged.slice(merged.length - PULSE_MAX_POINTS);
+      });
+    }
+
+    if (hasRegionPulses) {
+      setPulseRegions((prev) => mergePulseRegions(prev, nextRegionPulses));
+    }
+
+    if (hasPointPulses || hasRegionPulses) {
+      setPulseNow(now);
+    }
+  }, [events]);
+
+  useEffect(() => {
+    if (pulsePoints.length === 0 && pulseRegions.length === 0) {
+      return;
+    }
+    let frameId = 0;
+
+    const tick = () => {
+      const now = Date.now();
+      setPulseNow(now);
+      setPulsePoints((prev) => {
+        if (prev.length === 0) {
+          return prev;
+        }
+        let hasExpired = false;
+        const next: PulsePoint[] = [];
+        for (let i = 0; i < prev.length; i += 1) {
+          const point = prev[i];
+          if (now - point.startedAt <= PULSE_DURATION_MS) {
+            next.push(point);
+          } else {
+            hasExpired = true;
+          }
+        }
+        return hasExpired ? next : prev;
+      });
+      setPulseRegions((prev) => {
+        if (prev.length === 0) {
+          return prev;
+        }
+        let hasExpired = false;
+        const next: PulseRegion[] = [];
+        for (let i = 0; i < prev.length; i += 1) {
+          const pulse = prev[i];
+          if (now - pulse.startedAt <= REGION_PULSE_DURATION_MS) {
+            next.push(pulse);
+          } else {
+            hasExpired = true;
+          }
+        }
+        return hasExpired ? next : prev;
+      });
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [pulsePoints.length, pulseRegions.length]);
 
   useEffect(() => {
     let isActive = true;
@@ -194,6 +497,39 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       },
     });
 
+    const regionPulseLayer =
+      pulseRegionFeatures.length > 0
+        ? new GeoJsonLayer<GeoRegionProperties>({
+            id: 'region-pulse',
+            data: pulseRegionFeatures,
+            stroked: true,
+            filled: true,
+            lineWidthUnits: 'pixels',
+            lineWidthMinPixels: 1,
+            getLineWidth: REGION_PULSE_LINE_WIDTH,
+            getLineColor: (feature) => {
+              const code = feature.properties.SIG_CD;
+              const pulse = pulseRegionLookup.codes5.get(code) ?? pulseRegionLookup.codes2.get(code.slice(0, 2));
+              if (!pulse) {
+                return [0, 0, 0, 0];
+              }
+              return getRegionPulseLineColor(pulse, pulseNow);
+            },
+            getFillColor: (feature) => {
+              const code = feature.properties.SIG_CD;
+              const pulse = pulseRegionLookup.codes5.get(code) ?? pulseRegionLookup.codes2.get(code.slice(0, 2));
+              if (!pulse) {
+                return [0, 0, 0, 0];
+              }
+              return getRegionPulseFillColor(pulse, pulseNow);
+            },
+            updateTriggers: {
+              getLineColor: [pulseNow, pulseRegions],
+              getFillColor: [pulseNow, pulseRegions],
+            },
+          })
+        : null;
+
     const pointsLayer = new ScatterplotLayer<MapPoint>({
       id: 'event-points',
       data: eventPoints,
@@ -207,8 +543,47 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       getLineWidth: 1.5,
     });
 
-    return [regionLayer, pointsLayer];
-  }, [eventPoints, regionData, regionTargets]);
+    const pulseLayer =
+      pulsePoints.length > 0
+        ? new ScatterplotLayer<PulsePoint>({
+            id: 'event-pulse',
+            data: pulsePoints,
+            opacity: 1,
+            radiusUnits: 'pixels',
+            getPosition: (point) => point.position,
+            getRadius: (point) => getPulseRadius(point, pulseNow),
+            stroked: true,
+            filled: false,
+            lineWidthUnits: 'pixels',
+            getLineWidth: 2.2,
+            getLineColor: (point) => getPulseColor(point, pulseNow),
+            updateTriggers: {
+              getRadius: [pulseNow],
+              getLineColor: [pulseNow],
+            },
+          })
+        : null;
+
+    const nextLayers: Layer[] = [regionLayer];
+    if (regionPulseLayer) {
+      nextLayers.push(regionPulseLayer);
+    }
+    nextLayers.push(pointsLayer);
+    if (pulseLayer) {
+      nextLayers.push(pulseLayer);
+    }
+
+    return nextLayers;
+  }, [
+    eventPoints,
+    pulseNow,
+    pulsePoints,
+    pulseRegionFeatures,
+    pulseRegionLookup,
+    pulseRegions,
+    regionData,
+    regionTargets,
+  ]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
