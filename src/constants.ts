@@ -91,7 +91,7 @@ export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
   [EventKinds.Livestock]: '🐮',
   [EventKinds.Wind]: '💨',
   [EventKinds.Dry]: '☀️',
-  [EventKinds.Transport]: '🚌',
+  [EventKinds.Transport]: '🚦',
   [EventKinds.TrafficCrash]: '💥',
   [EventKinds.TrafficCtrl]: '🚧',
   [EventKinds.Finance]: '💹',
