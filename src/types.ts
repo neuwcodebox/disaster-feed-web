@@ -45,6 +45,7 @@ export enum EventKinds {
   O3 = 36,
   CrowdDensity = 37,
   WildAnimal = 38,
+  Cyber = 39,
 }
 
 export enum EventSources {
@@ -58,6 +59,7 @@ export enum EventSources {
   AirkoreaO3Warning = 8,
   ForestFireInfo = 9,
   YnaNews = 10,
+  NcscCyberCrisis = 11,
 }
 
 export type EventGeo = {

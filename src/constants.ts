@@ -83,11 +83,12 @@ export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.O3]: '오존',
   [EventKinds.CrowdDensity]: '인파밀집',
   [EventKinds.WildAnimal]: '야생동물',
+  [EventKinds.Cyber]: '사이버',
 };
 
 export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
   [EventKinds.Other]: '❔',
-  [EventKinds.Quake]: '🌎',
+  [EventKinds.Quake]: '🎯',
   [EventKinds.Ai]: '🐦',
   [EventKinds.Drought]: '🏜️',
   [EventKinds.Livestock]: '🐮',
@@ -124,6 +125,7 @@ export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
   [EventKinds.O3]: '🧪',
   [EventKinds.CrowdDensity]: '👥',
   [EventKinds.WildAnimal]: '🐗',
+  [EventKinds.Cyber]: '🌐',
 };
 
 export const getEventKindIcon = (kind: number): string => EVENT_KIND_ICONS[kind as EventKinds] ?? '?';
@@ -142,6 +144,7 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.AirkoreaPmWarning]: '환경부\n(PM)',
   [EventSources.AirkoreaO3Warning]: '환경부\n(O3)',
   [EventSources.ForestFireInfo]: '산림청\n(산불)',
+  [EventSources.NcscCyberCrisis]: '국정원\n(사이버)',
   [EventSources.YnaNews]: '연합뉴스',
 };
 
@@ -155,6 +158,7 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.AirkoreaPmWarning]: '환경부',
   [EventSources.AirkoreaO3Warning]: '환경부',
   [EventSources.ForestFireInfo]: '산림청',
+  [EventSources.NcscCyberCrisis]: '국정원',
   [EventSources.YnaNews]: '연합뉴스',
 };
 
@@ -168,6 +172,7 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.AirkoreaPmWarning,
   EventSources.AirkoreaO3Warning,
   EventSources.ForestFireInfo,
+  EventSources.NcscCyberCrisis,
   EventSources.YnaNews,
 ];
 
