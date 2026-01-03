@@ -20,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
   }, []);
 
   return (
-    <header className="h-auto bg-slate-900 flex flex-col lg:flex-row items-center justify-between px-4 py-3 border-b border-slate-800 shadow-2xl relative z-20 shrink-0 gap-4 lg:gap-0">
+    <header className="h-auto bg-slate-900 flex flex-col lg:flex-row flex-wrap items-center justify-between px-4 py-3 border-b border-slate-800 shadow-2xl relative z-20 shrink-0 gap-x-8 gap-y-3">
       <div className="flex items-center space-x-3 md:space-x-4 w-full lg:w-auto">
         <div className="bg-red-600 p-1.5 md:p-2 rounded-lg animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.4)]">
           <Activity className="w-5 h-5 md:w-8 md:h-8 text-white" />
@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
         </div>
       </div>
 
-      <div className="flex items-center justify-between lg:justify-end w-full lg:w-auto space-x-4 lg:space-x-12">
+      <div className="flex flex-wrap items-center justify-between lg:justify-end w-full lg:w-auto gap-x-2 gap-y-3 md:gap-x-3 lg:gap-x-12">
         {/* Detailed Source Statuses - more compact on mobile */}
         <div className="flex items-center space-x-2 md:space-x-3 bg-slate-950/50 p-1.5 md:p-2 rounded-xl border border-slate-800 flex-1 md:flex-none justify-center">
           <div className="hidden sm:flex px-2 border-r border-slate-800 flex-col items-center justify-center">
