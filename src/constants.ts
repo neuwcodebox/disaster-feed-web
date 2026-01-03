@@ -81,6 +81,8 @@ export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.Pollution]: '환경오염',
   [EventKinds.YellowDust]: '황사',
   [EventKinds.O3]: '오존',
+  [EventKinds.CrowdDensity]: '인파밀집',
+  [EventKinds.WildAnimal]: '야생동물',
 };
 
 export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
@@ -120,6 +122,8 @@ export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
   [EventKinds.Pollution]: '🏭',
   [EventKinds.YellowDust]: '🟡',
   [EventKinds.O3]: '🧪',
+  [EventKinds.CrowdDensity]: '👥',
+  [EventKinds.WildAnimal]: '🐗',
 };
 
 export const getEventKindIcon = (kind: number): string => EVENT_KIND_ICONS[kind as EventKinds] ?? '?';

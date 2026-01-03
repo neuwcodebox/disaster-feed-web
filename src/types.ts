@@ -43,6 +43,8 @@ export enum EventKinds {
   Pollution = 34,
   YellowDust = 35,
   O3 = 36,
+  CrowdDensity = 37,
+  WildAnimal = 38,
 }
 
 export enum EventSources {
