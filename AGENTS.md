@@ -36,6 +36,7 @@
 - `then` 대신 `async/await`를 사용합니다.
 - 주석은 남용하지 말고 코드만 봐서 이해하기 어려운 부분에만 한국어로 작성합니다.
 - Code smells를 피합니다. (예: 중복 코드, 긴 함수, 긴 매개변수 목록 등)
+- 한 컴포넌트를 너무 크게 만들지 말고 적절히 분리합니다.
 - 타입에는 PascalCase, 변수/함수/메서드에는 camelCase, 상수에는 UPPER_SNAKE_CASE를 사용합니다.
 - enum 이름은 복수형으로 작성합니다.
 - Zod 스키마 변수는 schemaXXX 형태의 camelCase로 작성합니다.

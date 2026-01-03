@@ -15,6 +15,7 @@ import DisasterMap from './components/DisasterMap';
 import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
+import UpdateNotifier from './components/UpdateNotifier';
 import {
   EVENT_KIND_VALUES,
   EVENT_LEVEL_SOUNDS,
@@ -456,6 +457,8 @@ const App: React.FC = () => {
           <MapIcon className="w-5 h-5" />
         </button>
       ) : null}
+
+      <UpdateNotifier />
 
       <FooterMarquee events={recentEvents.slice(0, 10)} />
     </div>
