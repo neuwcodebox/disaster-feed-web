@@ -184,7 +184,7 @@ const collectRegionKindSummaries = (events: DisasterEvent[]): RegionKindSummarie
   const codes5 = new Map<string, RegionKindSummary>();
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i];
-    if (!event.regionCodes) {
+    if (!event.regionCodes || event.geo) {
       continue;
     }
     for (let j = 0; j < event.regionCodes.length; j += 1) {

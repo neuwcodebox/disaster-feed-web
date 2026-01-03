@@ -109,16 +109,25 @@ const collectRegionLevels = (events: DisasterEvent[]): RegionLevels => {
   const codes2 = new Map<string, EventLevels>();
   const codes5 = new Map<string, EventLevels>();
   for (let i = 0; i < events.length; i += 1) {
-    const regionCodes = events[i].regionCodes;
-    const level = events[i].level;
+    const event = events[i];
+
+    if (event.geo) {
+      continue;
+    }
+
+    const level = event.level;
+    const regionCodes = event.regionCodes;
+
     if (!regionCodes) {
       continue;
     }
+
     for (let j = 0; j < regionCodes.length; j += 1) {
       const normalized = normalizeRegionCode(regionCodes[j]);
       if (!normalized) {
         continue;
       }
+
       const prefix = resolveRegionPrefix(normalized);
       if (prefix.length === 2) {
         const existing = codes2.get(prefix);
@@ -267,8 +276,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           title: event.title,
           startedAt: now,
         });
-      }
-      if (event.regionCodes) {
+      } else if (event.regionCodes) {
         for (let j = 0; j < event.regionCodes.length; j += 1) {
           const normalized = normalizeRegionCode(event.regionCodes[j]);
           if (!normalized) {
