@@ -60,6 +60,7 @@ export enum EventSources {
   ForestFireInfo = 9,
   YnaNews = 10,
   NcscCyberCrisis = 11,
+  NctcTerrorAlert = 12,
 }
 
 export type EventGeo = {
