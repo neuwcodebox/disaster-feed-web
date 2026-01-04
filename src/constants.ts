@@ -146,6 +146,7 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.ForestFireInfo]: '산림청\n(산불)',
   [EventSources.NcscCyberCrisis]: '국정원\n(사이버)',
   [EventSources.NctcTerrorAlert]: '국조실\n(테러)',
+  [EventSources.KpxPowerSupply]: '산업부\n(전력)',
   [EventSources.YnaNews]: '연합뉴스',
 };
 
@@ -161,6 +162,7 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.ForestFireInfo]: '산림청',
   [EventSources.NcscCyberCrisis]: '국정원',
   [EventSources.NctcTerrorAlert]: '국조실',
+  [EventSources.KpxPowerSupply]: '산업부',
   [EventSources.YnaNews]: '연합뉴스',
 };
 
@@ -176,6 +178,7 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.ForestFireInfo,
   EventSources.NcscCyberCrisis,
   EventSources.NctcTerrorAlert,
+  EventSources.KpxPowerSupply,
   EventSources.YnaNews,
 ];
 
