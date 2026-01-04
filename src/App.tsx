@@ -25,6 +25,7 @@ import {
   STATUS_SOURCE_LABELS,
 } from './constants';
 import { type CategoryGroup, type CategorySortMode, type DisasterEvent, EventLevels, type SourceStatus } from './types';
+import { filterEventsByAge } from './utils/eventFilters';
 
 const createInitialSourceStatuses = (): SourceStatus[] => {
   const initial: SourceStatus[] = [];
@@ -93,21 +94,6 @@ const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): 
     limited.push(event);
   }
   return limited;
-};
-
-const filterEventsByAge = (items: DisasterEvent[], nowMs: number, maxAgeMs: number): DisasterEvent[] => {
-  if (maxAgeMs <= 0) {
-    return items;
-  }
-  const threshold = nowMs - maxAgeMs;
-  const filtered: DisasterEvent[] = [];
-  for (let i = 0; i < items.length; i += 1) {
-    const event = items[i];
-    if (event.timestamp >= threshold) {
-      filtered.push(event);
-    }
-  }
-  return filtered;
 };
 
 const App: React.FC = () => {
@@ -444,7 +430,13 @@ const App: React.FC = () => {
           <CategoryGrid groups={categoryGroups} sortMode={categorySortMode} onSortModeChange={setCategorySortMode} />
         </div>
 
-        <DisasterMap events={recentEvents} isOpen={isMapVisible} isLargeScreen={isLargeScreen} onClose={closeMap} />
+        <DisasterMap
+          events={recentEvents}
+          isOpen={isMapVisible}
+          isLargeScreen={isLargeScreen}
+          onClose={closeMap}
+          maxEventAgeMs={MAX_EVENT_AGE_MS}
+        />
       </main>
 
       {!isLargeScreen && !isMapOpen ? (

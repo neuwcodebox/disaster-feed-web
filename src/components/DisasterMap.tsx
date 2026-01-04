@@ -7,6 +7,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { DisasterEvent, EventLevels } from '../types';
+import { filterEventsByAge } from '../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
 import DisasterMapEmojiMarkers, {
   buildRegionCentroids,
@@ -41,6 +42,7 @@ interface DisasterMapProps {
   isOpen: boolean;
   isLargeScreen: boolean;
   onClose: () => void;
+  maxEventAgeMs: number;
 }
 
 type MapPoint = {
@@ -56,7 +58,7 @@ type PulseRegionLookup = {
 };
 
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const MAP_CENTER: [number, number] = [127.7, 36.7];
+const MAP_CENTER: [number, number] = [127.7, 36.4];
 const MAP_DEFAULT_VIEW = {
   center: MAP_CENTER,
   zoom: 6,
@@ -70,6 +72,29 @@ const REGION_PULSE_MAX_AREAS = 10;
 const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
   type: 'FeatureCollection',
   features: [],
+};
+const WINDOW_STEP_MS = 15 * 60 * 1000;
+const WINDOW_REFRESH_INTERVAL_MS = 60000;
+
+const formatWindowLabel = (durationMs: number): string => {
+  const totalMinutes = Math.max(1, Math.round(durationMs / 60000));
+  if (totalMinutes < 60) {
+    return `${totalMinutes}분`;
+  }
+  const totalHours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  if (totalHours < 24) {
+    if (remainingMinutes === 0) {
+      return `${totalHours}시간`;
+    }
+    return `${totalHours}시간 ${remainingMinutes}분`;
+  }
+  const totalDays = Math.floor(totalHours / 24);
+  const remainingHours = totalHours % 24;
+  if (remainingHours === 0) {
+    return `${totalDays}일`;
+  }
+  return `${totalDays}일 ${remainingHours}시간`;
 };
 
 const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
@@ -162,7 +187,7 @@ const collectEventPoints = (events: DisasterEvent[]): MapPoint[] => {
   return points;
 };
 
-const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen, onClose }) => {
+const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen, onClose, maxEventAgeMs }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
@@ -176,9 +201,31 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const hasSeededEventsRef = useRef(false);
   const pointEmojiLabelsRef = useRef<EmojiLabel[]>([]);
   const regionEmojiLabelsRef = useRef<EmojiLabel[]>([]);
+  const [windowAgeMs, setWindowAgeMs] = useState(24 * 60 * 60 * 1000);
+  const [windowNowMs, setWindowNowMs] = useState(() => Date.now());
 
-  const regionLevels = useMemo(() => collectRegionLevels(events), [events]);
-  const eventPoints = useMemo(() => collectEventPoints(events), [events]);
+  const sliderStepMs = Math.min(WINDOW_STEP_MS, maxEventAgeMs);
+  const sliderMinMs = sliderStepMs;
+
+  useEffect(() => {
+    setWindowAgeMs((prev) => (prev > maxEventAgeMs ? maxEventAgeMs : prev));
+  }, [maxEventAgeMs]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setWindowNowMs(Date.now());
+    }, WINDOW_REFRESH_INTERVAL_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  const visibleEvents = useMemo(
+    () => filterEventsByAge(events, windowNowMs, windowAgeMs),
+    [events, windowAgeMs, windowNowMs],
+  );
+  const regionLevels = useMemo(() => collectRegionLevels(visibleEvents), [visibleEvents]);
+  const eventPoints = useMemo(() => collectEventPoints(visibleEvents), [visibleEvents]);
   const regionIndex = useMemo<GeoRegionIndex | null>(() => {
     if (!regionData) {
       return null;
@@ -201,8 +248,11 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     return { byCode, byPrefix };
   }, [regionData]);
   const regionCentroids = useMemo(() => buildRegionCentroids(regionIndex), [regionIndex]);
-  const regionEmojiLabels = useMemo(() => buildRegionEmojiLabels(events, regionCentroids), [events, regionCentroids]);
-  const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(events), [events]);
+  const regionEmojiLabels = useMemo(
+    () => buildRegionEmojiLabels(visibleEvents, regionCentroids),
+    [regionCentroids, visibleEvents],
+  );
+  const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(visibleEvents), [visibleEvents]);
   const pulseRegionLookup = useMemo<PulseRegionLookup>(() => {
     const codes2 = new Map<string, PulseRegion>();
     const codes5 = new Map<string, PulseRegion>();
@@ -258,6 +308,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     const nextPulses: PulsePoint[] = [];
     const nextRegionPulses: PulseRegion[] = [];
     const now = Date.now();
+    const threshold = now - windowAgeMs;
 
     for (let i = 0; i < events.length; i += 1) {
       const event = events[i];
@@ -266,6 +317,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         continue;
       }
       if (!event.isRealtime) {
+        continue;
+      }
+      if (event.timestamp < threshold) {
         continue;
       }
       if (event.geo) {
@@ -321,7 +375,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     if (hasPointPulses || hasRegionPulses) {
       setPulseNow(now);
     }
-  }, [events]);
+  }, [events, windowAgeMs]);
 
   useEffect(() => {
     if (pulsePoints.length === 0 && pulseRegions.length === 0) {
@@ -661,6 +715,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     ? 'gap-1 px-2 py-1 text-[8px] md:text-[10px]'
     : 'gap-2 px-3 py-1.5 text-xs md:text-sm';
   const resetIconSizeClass = isLargeScreen ? 'w-3 h-3 md:w-3.5 md:h-3.5' : 'w-3.5 h-3.5 md:w-4 md:h-4';
+  const windowLabel = useMemo(() => formatWindowLabel(windowAgeMs), [windowAgeMs]);
+  const maxWindowLabel = useMemo(() => formatWindowLabel(maxEventAgeMs), [maxEventAgeMs]);
+  const minWindowLabel = useMemo(() => formatWindowLabel(sliderMinMs), [sliderMinMs]);
 
   return (
     <section
@@ -713,6 +770,38 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <DisasterMapEmojiMarkers markers={regionEmojiMarkers} variant="region" />
           <DisasterMapEmojiMarkers markers={pointEmojiMarkers} variant="point" />
+        </div>
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 sm:inset-x-5 sm:bottom-5">
+          <div className="pointer-events-auto flex flex-col gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/85 p-3 shadow-[0_16px_36px_rgba(2,6,23,0.55)] backdrop-blur md:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs md:text-sm">
+              <div className="flex items-center gap-2 font-semibold text-slate-200">최근 {windowLabel}</div>
+              <button
+                type="button"
+                onClick={() => setWindowAgeMs(maxEventAgeMs)}
+                disabled={windowAgeMs >= maxEventAgeMs}
+                className="rounded-full border border-slate-700/80 px-2 py-1 text-[10px] md:text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white disabled:cursor-default disabled:border-slate-800 disabled:text-slate-600"
+              >
+                전체 보기
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] md:text-xs text-slate-500 whitespace-nowrap">{minWindowLabel}</span>
+              <input
+                id="map-time-window"
+                type="range"
+                min={sliderMinMs}
+                max={maxEventAgeMs}
+                step={sliderStepMs}
+                value={windowAgeMs}
+                onChange={(event) => {
+                  setWindowAgeMs(Number(event.target.value));
+                }}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-linear-to-r from-slate-700 via-slate-600 to-blue-500 accent-blue-400"
+                aria-label="지도 표시 시간 범위"
+              />
+              <span className="text-[10px] md:text-xs text-slate-500 whitespace-nowrap">{maxWindowLabel}</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
