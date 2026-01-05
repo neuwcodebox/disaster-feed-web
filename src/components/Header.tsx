@@ -54,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
                 />
                 <span
                   title={source.name}
-                  className={`hidden sm:block text-[7px] md:text-[9px] font-semibold leading-tight whitespace-pre-line break-words text-center max-w-14 md:max-w-20 ${source.isConnected ? 'text-slate-400' : 'text-red-400'}`}
+                  className={`hidden sm:block text-[7px] md:text-[9px] font-semibold leading-tight whitespace-pre-line wrap-break-word text-center max-w-14 md:max-w-20 ${source.isConnected ? 'text-slate-400' : 'text-red-400'}`}
                 >
                   {source.name}
                 </span>
