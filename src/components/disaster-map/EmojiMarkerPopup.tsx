@@ -111,7 +111,7 @@ const EmojiMarkerPopup: React.FC<EmojiMarkerPopupProps> = ({
     <div className="pointer-events-none absolute inset-0 z-20">
       <div
         ref={setPopupElement}
-        className="min-w-[220px] max-w-[320px] rounded-xl border border-slate-800/80 bg-slate-950/90 p-3 text-slate-100 shadow-[0_12px_30px_rgba(2,6,23,0.55)] backdrop-blur"
+        className="min-w-55 max-w-[320px] rounded-xl border border-slate-800/80 bg-slate-950/90 p-3 text-slate-100 shadow-[0_12px_30px_rgba(2,6,23,0.55)] backdrop-blur"
         style={{
           position: 'absolute',
           left: position ? position.left : marker.x,
@@ -120,7 +120,7 @@ const EmojiMarkerPopup: React.FC<EmojiMarkerPopupProps> = ({
         }}
       >
         <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
-          <span>관련 이벤트</span>
+          <span>이벤트 목록</span>
           <span>{label.events.length}건</span>
         </div>
         <div className="mt-2 space-y-1.5">
