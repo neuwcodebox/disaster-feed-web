@@ -1,4 +1,4 @@
-import type { DisasterEvent, EventLevels } from '../types';
+import type { DisasterEvent, EventLevels } from '../../types';
 
 export type RegionLevels = {
   codes2: Map<string, EventLevels>;

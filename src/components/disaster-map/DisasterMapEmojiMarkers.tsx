@@ -1,7 +1,7 @@
 import type { Map as MaplibreMap } from 'maplibre-gl';
 import type React from 'react';
-import { getEventKindIcon } from '../constants';
-import { type DisasterEvent, EventLevels } from '../types';
+import { getEventKindIcon } from '../../constants';
+import { type DisasterEvent, EventLevels } from '../../types';
 import { normalizeRegionCode, resolveRegionPrefix } from './DisasterMapRegionCodes';
 import type { EmojiLabel, EmojiMarker, GeoRegionFeature, GeoRegionIndex } from './DisasterMapTypes';
 

@@ -1,23 +1,18 @@
 import type { Layer } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { MapboxOverlay } from '@deck.gl/mapbox';
-import { formatDistanceToNow } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { MapIcon, RotateCcw, X } from 'lucide-react';
-import type { MapMouseEvent } from 'maplibre-gl';
 import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getEventKindIcon } from '../constants';
-import type { DisasterEvent, EventLevels } from '../types';
-import { filterEventsByAge } from '../utils/eventFilters';
+import type { DisasterEvent, EventLevels } from '../../types';
+import { filterEventsByAge } from '../../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
 import DisasterMapEmojiMarkers, {
   buildRegionCentroids,
   buildRegionEmojiLabels,
   collectPointEmojiLabels,
-  getEmojiMarkerBounds,
   projectEmojiMarkers,
 } from './DisasterMapEmojiMarkers';
 import { getRegionFillColor, LEVEL_COLORS, LEVEL_RADII } from './DisasterMapPalette';
@@ -41,6 +36,8 @@ import type {
   PulseRegion,
   RegionLevels,
 } from './DisasterMapTypes';
+import EmojiMarkerPopup from './EmojiMarkerPopup';
+import { useEmojiMarkerSelection } from './useEmojiMarkerSelection';
 
 interface DisasterMapProps {
   events: DisasterEvent[];
@@ -55,11 +52,6 @@ type MapPoint = {
   position: [number, number];
   level: EventLevels;
   title: string;
-};
-
-type ScreenPoint = {
-  x: number;
-  y: number;
 };
 
 type PulseRegionLookup = {
@@ -85,9 +77,6 @@ const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
 };
 const WINDOW_STEP_MS = 15 * 60 * 1000;
 const WINDOW_REFRESH_INTERVAL_MS = 60000;
-const EMOJI_MARKER_HIT_PADDING = 6;
-const EMOJI_MARKER_MAX_EVENTS = 4;
-const EMOJI_MARKER_POPUP_OFFSET = 12;
 
 const formatWindowLabel = (durationMs: number): string => {
   const totalMinutes = Math.max(1, Math.round(durationMs / 60000));
@@ -108,32 +97,6 @@ const formatWindowLabel = (durationMs: number): string => {
     return `${totalDays}일`;
   }
   return `${totalDays}일 ${remainingHours}시간`;
-};
-
-const formatRelativeTime = (timestamp: number) =>
-  formatDistanceToNow(timestamp, {
-    addSuffix: true,
-    locale: ko,
-  });
-
-const findEmojiMarkerAtPoint = (markers: EmojiMarker[], point: ScreenPoint, padding: number): EmojiMarker | null => {
-  let best: EmojiMarker | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < markers.length; i += 1) {
-    const marker = markers[i];
-    const bounds = getEmojiMarkerBounds(marker, padding);
-    if (point.x < bounds.left || point.x > bounds.right || point.y < bounds.top || point.y > bounds.bottom) {
-      continue;
-    }
-    const dx = point.x - marker.x;
-    const dy = point.y - marker.y;
-    const distance = dx * dx + dy * dy;
-    if (!best || distance < bestDistance) {
-      best = marker;
-      bestDistance = distance;
-    }
-  }
-  return best;
 };
 
 const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
@@ -229,6 +192,7 @@ const collectEventPoints = (events: DisasterEvent[]): MapPoint[] => {
 const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen, onClose, maxEventAgeMs }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const [regionData, setRegionData] = useState<GeoRegionFeatureCollection | null>(null);
   const [pulsePoints, setPulsePoints] = useState<PulsePoint[]>([]);
@@ -236,9 +200,6 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const [pulseNow, setPulseNow] = useState(0);
   const [pointEmojiMarkers, setPointEmojiMarkers] = useState<EmojiMarker[]>([]);
   const [regionEmojiMarkers, setRegionEmojiMarkers] = useState<EmojiMarker[]>([]);
-  const pointEmojiMarkersRef = useRef<EmojiMarker[]>([]);
-  const regionEmojiMarkersRef = useRef<EmojiMarker[]>([]);
-  const [selectedEmojiMarkerId, setSelectedEmojiMarkerId] = useState<string | null>(null);
   const knownEventIdsRef = useRef<Set<string>>(new Set());
   const hasSeededEventsRef = useRef(false);
   const pointEmojiLabelsRef = useRef<EmojiLabel[]>([]);
@@ -295,35 +256,13 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     [regionCentroids, visibleEvents],
   );
   const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(visibleEvents), [visibleEvents]);
-  const emojiLabelById = useMemo(() => {
-    const map = new Map<string, EmojiLabel>();
-    for (let i = 0; i < pointEmojiLabels.length; i += 1) {
-      map.set(pointEmojiLabels[i].id, pointEmojiLabels[i]);
-    }
-    for (let i = 0; i < regionEmojiLabels.length; i += 1) {
-      map.set(regionEmojiLabels[i].id, regionEmojiLabels[i]);
-    }
-    return map;
-  }, [pointEmojiLabels, regionEmojiLabels]);
-  const selectedEmojiLabel = selectedEmojiMarkerId ? (emojiLabelById.get(selectedEmojiMarkerId) ?? null) : null;
-  const selectedEmojiMarker = useMemo(() => {
-    if (!selectedEmojiMarkerId) {
-      return null;
-    }
-    for (let i = 0; i < pointEmojiMarkers.length; i += 1) {
-      const marker = pointEmojiMarkers[i];
-      if (marker.id === selectedEmojiMarkerId) {
-        return marker;
-      }
-    }
-    for (let i = 0; i < regionEmojiMarkers.length; i += 1) {
-      const marker = regionEmojiMarkers[i];
-      if (marker.id === selectedEmojiMarkerId) {
-        return marker;
-      }
-    }
-    return null;
-  }, [pointEmojiMarkers, regionEmojiMarkers, selectedEmojiMarkerId]);
+  const { selectedMarker: selectedEmojiMarker, selectedLabel: selectedEmojiLabel } = useEmojiMarkerSelection({
+    map: mapInstance,
+    pointMarkers: pointEmojiMarkers,
+    regionMarkers: regionEmojiMarkers,
+    pointLabels: pointEmojiLabels,
+    regionLabels: regionEmojiLabels,
+  });
   const pulseRegionLookup = useMemo<PulseRegionLookup>(() => {
     const codes2 = new Map<string, PulseRegion>();
     const codes5 = new Map<string, PulseRegion>();
@@ -337,15 +276,6 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     }
     return { codes2, codes5 };
   }, [pulseRegions]);
-
-  useEffect(() => {
-    if (!selectedEmojiMarkerId) {
-      return;
-    }
-    if (!emojiLabelById.has(selectedEmojiMarkerId)) {
-      setSelectedEmojiMarkerId(null);
-    }
-  }, [emojiLabelById, selectedEmojiMarkerId]);
 
   const pulseRegionFeatures = useMemo<GeoRegionFeature[]>(() => {
     if (!regionIndex || pulseRegions.length === 0) {
@@ -655,14 +585,10 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     if (!map) {
       setPointEmojiMarkers([]);
       setRegionEmojiMarkers([]);
-      pointEmojiMarkersRef.current = [];
-      regionEmojiMarkersRef.current = [];
       return;
     }
     const nextPointMarkers = projectEmojiMarkers(pointEmojiLabelsRef.current, map);
     const nextRegionMarkers = projectEmojiMarkers(regionEmojiLabelsRef.current, map);
-    pointEmojiMarkersRef.current = nextPointMarkers;
-    regionEmojiMarkersRef.current = nextRegionMarkers;
     setPointEmojiMarkers(nextPointMarkers);
     setRegionEmojiMarkers(nextRegionMarkers);
   }, []);
@@ -689,6 +615,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     });
 
     mapRef.current = map;
+    setMapInstance(map);
 
     const overlay = new MapboxOverlay({ interleaved: true, layers: [] });
     overlayRef.current = overlay;
@@ -702,22 +629,6 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       }),
       'top-right',
     );
-    const handleMapClick = (event: MapMouseEvent) => {
-      const pointHit = findEmojiMarkerAtPoint(pointEmojiMarkersRef.current, event.point, EMOJI_MARKER_HIT_PADDING);
-      const hit = pointHit
-        ? pointHit
-        : findEmojiMarkerAtPoint(regionEmojiMarkersRef.current, event.point, EMOJI_MARKER_HIT_PADDING);
-      setSelectedEmojiMarkerId((prev) => {
-        if (!hit) {
-          return null;
-        }
-        if (prev === hit.id) {
-          return null;
-        }
-        return hit.id;
-      });
-    };
-    map.on('click', handleMapClick);
     map.on('load', () => {
       const style = map.getStyle();
       const layers = style?.layers ?? [];
@@ -742,10 +653,10 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
 
     return () => {
       resizeObserver.disconnect();
-      map.off('click', handleMapClick);
       map.remove();
       mapRef.current = null;
       overlayRef.current = null;
+      setMapInstance(null);
     };
   }, [updateEmojiMarkers]);
 
@@ -822,9 +733,6 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const windowLabel = useMemo(() => formatWindowLabel(windowAgeMs), [windowAgeMs]);
   const maxWindowLabel = useMemo(() => formatWindowLabel(maxEventAgeMs), [maxEventAgeMs]);
   const minWindowLabel = useMemo(() => formatWindowLabel(sliderMinMs), [sliderMinMs]);
-  const selectedEmojiEvents = selectedEmojiLabel?.events ?? [];
-  const visibleEmojiEvents = selectedEmojiEvents.slice(0, EMOJI_MARKER_MAX_EVENTS);
-  const remainingEmojiEventCount = Math.max(0, selectedEmojiEvents.length - visibleEmojiEvents.length);
 
   return (
     <section
@@ -878,42 +786,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           <DisasterMapEmojiMarkers markers={regionEmojiMarkers} variant="region" />
           <DisasterMapEmojiMarkers markers={pointEmojiMarkers} variant="point" />
         </div>
-        {selectedEmojiMarker && selectedEmojiLabel && selectedEmojiEvents.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-20">
-            <div
-              className="min-w-[220px] max-w-[320px] rounded-xl border border-slate-800/80 bg-slate-950/90 p-3 text-slate-100 shadow-[0_12px_30px_rgba(2,6,23,0.55)] backdrop-blur"
-              style={{
-                position: 'absolute',
-                left: selectedEmojiMarker.x,
-                top: selectedEmojiMarker.y,
-                transform: `translate(-50%, calc(-100% - ${EMOJI_MARKER_POPUP_OFFSET}px))`,
-              }}
-            >
-              <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
-                <span>관련 이벤트</span>
-                <span>{selectedEmojiEvents.length}건</span>
-              </div>
-              <div className="mt-2 space-y-1.5">
-                {visibleEmojiEvents.map((event) => (
-                  <div key={event.id} className="flex items-start gap-2">
-                    <span className="text-base leading-none" aria-hidden="true">
-                      {getEventKindIcon(event.kind)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold text-slate-100">{event.title}</div>
-                      <div className="text-[10px] font-medium text-slate-400">
-                        {formatRelativeTime(event.timestamp)} · {event.source}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {remainingEmojiEventCount > 0 && (
-                <div className="mt-2 text-[10px] font-semibold text-slate-500">외 {remainingEmojiEventCount}건</div>
-              )}
-            </div>
-          </div>
-        )}
+        <EmojiMarkerPopup container={containerRef.current} marker={selectedEmojiMarker} label={selectedEmojiLabel} />
         <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 sm:inset-x-5 sm:bottom-5">
           <div className="pointer-events-auto flex flex-col gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/85 p-3 shadow-[0_16px_36px_rgba(2,6,23,0.55)] backdrop-blur md:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs md:text-sm">
