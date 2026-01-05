@@ -396,7 +396,7 @@ const CapitalInsetMap: React.FC<CapitalInsetMapProps> = ({
   return (
     <div className="pointer-events-none absolute left-3 top-3 z-30">
       <div
-        className="relative overflow-hidden rounded-xl border border-slate-700/60 bg-slate-950/85 shadow-[0_10px_30px_rgba(8,12,24,0.45)]"
+        className="relative overflow-hidden rounded-xl border border-slate-200/70 bg-slate-950/85 shadow-[0_10px_30px_rgba(8,12,24,0.45)] ring-1 ring-slate-900/60"
         style={{ width: capitalInsetSize.width, height: capitalInsetSize.height }}
       >
         <svg
