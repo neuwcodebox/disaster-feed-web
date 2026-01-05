@@ -11,7 +11,7 @@ import {
   toDisasterEvent,
 } from './api';
 import CategoryGrid from './components/CategoryGrid';
-import DisasterMap from './components/DisasterMap';
+import DisasterMap from './components/disaster-map/DisasterMap';
 import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';

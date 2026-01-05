@@ -1,4 +1,4 @@
-import { EventLevels } from '../types';
+import { EventLevels } from '../../types';
 
 const REGION_FILL_ALPHA = 70;
 

@@ -6,8 +6,8 @@ import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { DisasterEvent, EventLevels } from '../types';
-import { filterEventsByAge } from '../utils/eventFilters';
+import type { DisasterEvent, EventLevels } from '../../types';
+import { filterEventsByAge } from '../../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
 import DisasterMapEmojiMarkers, {
   buildRegionCentroids,
@@ -36,6 +36,8 @@ import type {
   PulseRegion,
   RegionLevels,
 } from './DisasterMapTypes';
+import EmojiMarkerPopup from './EmojiMarkerPopup';
+import { useEmojiMarkerSelection } from './useEmojiMarkerSelection';
 
 interface DisasterMapProps {
   events: DisasterEvent[];
@@ -190,6 +192,7 @@ const collectEventPoints = (events: DisasterEvent[]): MapPoint[] => {
 const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen, onClose, maxEventAgeMs }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const [regionData, setRegionData] = useState<GeoRegionFeatureCollection | null>(null);
   const [pulsePoints, setPulsePoints] = useState<PulsePoint[]>([]);
@@ -253,6 +256,13 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     [regionCentroids, visibleEvents],
   );
   const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(visibleEvents), [visibleEvents]);
+  const { selectedMarker: selectedEmojiMarker, selectedLabel: selectedEmojiLabel } = useEmojiMarkerSelection({
+    map: mapInstance,
+    pointMarkers: pointEmojiMarkers,
+    regionMarkers: regionEmojiMarkers,
+    pointLabels: pointEmojiLabels,
+    regionLabels: regionEmojiLabels,
+  });
   const pulseRegionLookup = useMemo<PulseRegionLookup>(() => {
     const codes2 = new Map<string, PulseRegion>();
     const codes5 = new Map<string, PulseRegion>();
@@ -266,6 +276,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     }
     return { codes2, codes5 };
   }, [pulseRegions]);
+
   const pulseRegionFeatures = useMemo<GeoRegionFeature[]>(() => {
     if (!regionIndex || pulseRegions.length === 0) {
       return [];
@@ -576,8 +587,10 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       setRegionEmojiMarkers([]);
       return;
     }
-    setPointEmojiMarkers(projectEmojiMarkers(pointEmojiLabelsRef.current, map));
-    setRegionEmojiMarkers(projectEmojiMarkers(regionEmojiLabelsRef.current, map));
+    const nextPointMarkers = projectEmojiMarkers(pointEmojiLabelsRef.current, map);
+    const nextRegionMarkers = projectEmojiMarkers(regionEmojiLabelsRef.current, map);
+    setPointEmojiMarkers(nextPointMarkers);
+    setRegionEmojiMarkers(nextRegionMarkers);
   }, []);
 
   const handleResetView = useCallback(() => {
@@ -602,6 +615,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     });
 
     mapRef.current = map;
+    setMapInstance(map);
 
     const overlay = new MapboxOverlay({ interleaved: true, layers: [] });
     overlayRef.current = overlay;
@@ -642,6 +656,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       map.remove();
       mapRef.current = null;
       overlayRef.current = null;
+      setMapInstance(null);
     };
   }, [updateEmojiMarkers]);
 
@@ -771,6 +786,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           <DisasterMapEmojiMarkers markers={regionEmojiMarkers} variant="region" />
           <DisasterMapEmojiMarkers markers={pointEmojiMarkers} variant="point" />
         </div>
+        <EmojiMarkerPopup container={containerRef.current} marker={selectedEmojiMarker} label={selectedEmojiLabel} />
         <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 sm:inset-x-5 sm:bottom-5">
           <div className="pointer-events-auto flex flex-col gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/85 p-3 shadow-[0_16px_36px_rgba(2,6,23,0.55)] backdrop-blur md:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs md:text-sm">
