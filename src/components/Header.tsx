@@ -35,27 +35,26 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between lg:justify-end w-full lg:w-auto gap-x-2 gap-y-3 md:gap-x-3 lg:gap-x-12">
+      <div className="flex flex-wrap items-center justify-between lg:justify-end w-full lg:w-auto gap-x-2 gap-y-3 md:gap-x-3 lg:gap-x-8">
         {/* Detailed Source Statuses - more compact on mobile */}
-        <div className="flex items-center space-x-2 md:space-x-3 bg-slate-950/50 p-1.5 md:p-2 rounded-xl border border-slate-800 flex-1 md:flex-none justify-center">
-          <div className="hidden sm:flex px-2 border-r border-slate-800 flex-col items-center justify-center">
-            <span className="text-[8px] font-black text-slate-500 uppercase leading-none mb-0.5 tracking-tighter">
-              DATA
-            </span>
-            <span className="text-[8px] font-black text-slate-500 uppercase leading-none tracking-tighter">STATUS</span>
+        <div className="flex items-center gap-1.5 md:gap-2 bg-slate-950/50 p-1 md:p-1.5 rounded-lg border border-slate-800 flex-1 md:flex-none justify-center">
+          <div className="hidden sm:flex px-1.5 border-r border-slate-800 flex-col items-center justify-center">
+            <span className="text-[7px] font-black text-slate-500 uppercase leading-none tracking-tighter">DATA</span>
+            <span className="text-[7px] font-black text-slate-500 uppercase leading-none tracking-tighter">STATUS</span>
           </div>
-          <div className="flex space-x-2 md:space-x-2">
+          <div className="flex flex-wrap items-start justify-center gap-x-2 gap-y-1 md:gap-x-2.5 md:gap-y-1.5 min-w-0">
             {sourceStatuses.map((source) => (
-              <div key={source.sourceId} className="flex flex-col items-center">
+              <div key={source.sourceId} className="flex flex-col items-center min-w-0">
                 <div
-                  className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full mb-0.5 transition-all duration-500 ${
+                  className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full mb-0.5 transition-all duration-500 ${
                     source.isConnected
-                      ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'
-                      : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse'
+                      ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.55)]'
+                      : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.55)] animate-pulse'
                   }`}
                 />
                 <span
-                  className={`hidden sm:block text-[8px] md:text-[10px] font-bold leading-tight whitespace-pre-line text-center ${source.isConnected ? 'text-slate-400' : 'text-red-400'}`}
+                  title={source.name}
+                  className={`hidden sm:block text-[7px] md:text-[9px] font-semibold leading-none text-center max-w-14 md:max-w-20 truncate ${source.isConnected ? 'text-slate-400' : 'text-red-400'}`}
                 >
                   {source.name}
                 </span>
