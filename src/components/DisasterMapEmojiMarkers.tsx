@@ -8,6 +8,8 @@ import type { EmojiLabel, EmojiMarker, GeoRegionFeature, GeoRegionIndex } from '
 type RegionKindSummary = {
   kindLevels: Map<number, EventLevels>;
   level: EventLevels;
+  events: DisasterEvent[];
+  eventIds: Set<string>;
 };
 
 type RegionKindSummaries = {
@@ -33,6 +35,13 @@ type MarkerLayout = {
   gap: number;
   width: number;
   height: number;
+};
+
+export type MarkerBounds = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 };
 
 type MarkerVariantStyle = {
@@ -80,9 +89,19 @@ const ensureRegionKindSummary = (target: Map<string, RegionKindSummary>, code: s
   const created: RegionKindSummary = {
     kindLevels: new Map(),
     level: EventLevels.Info,
+    events: [],
+    eventIds: new Set(),
   };
   target.set(code, created);
   return created;
+};
+
+const appendRegionEvent = (summary: RegionKindSummary, event: DisasterEvent) => {
+  if (summary.eventIds.has(event.id)) {
+    return;
+  }
+  summary.eventIds.add(event.id);
+  summary.events.push(event);
 };
 
 const updateKindLevels = (target: Map<number, EventLevels>, kind: number, level: EventLevels) => {
@@ -133,7 +152,14 @@ const buildEmojiTokens = (kindLevels: Map<number, EventLevels>, limit: number): 
 export const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] => {
   const clusters = new Map<
     string,
-    { lngSum: number; latSum: number; count: number; level: EventLevels; kinds: Map<number, EventLevels> }
+    {
+      lngSum: number;
+      latSum: number;
+      count: number;
+      level: EventLevels;
+      kinds: Map<number, EventLevels>;
+      events: DisasterEvent[];
+    }
   >();
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i];
@@ -151,6 +177,7 @@ export const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] =
         count: 0,
         level: event.level,
         kinds: new Map<number, EventLevels>(),
+        events: [],
       };
       clusters.set(key, cluster);
     }
@@ -161,6 +188,7 @@ export const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] =
       cluster.level = event.level;
     }
     updateKindLevels(cluster.kinds, event.kind, event.level);
+    cluster.events.push(event);
   }
   const labels: EmojiLabel[] = [];
   for (const [key, cluster] of clusters.entries()) {
@@ -174,6 +202,7 @@ export const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] =
       level: cluster.level,
       tokens,
       size: EMOJI_SIZES[cluster.level] ?? 14,
+      events: cluster.events,
     });
   }
   return labels;
@@ -199,6 +228,7 @@ const collectRegionKindSummaries = (events: DisasterEvent[]): RegionKindSummarie
         summary.level = event.level;
       }
       updateKindLevels(summary.kindLevels, event.kind, event.level);
+      appendRegionEvent(summary, event);
     }
   }
   return { codes2, codes5 };
@@ -327,6 +357,26 @@ export const buildRegionEmojiLabels = (
       level = Math.max(level, summary2.level);
       mergeKindLevels(mergedKindLevels, summary2.kindLevels);
     }
+    const mergedEventIds = new Set<string>();
+    if (summary5) {
+      for (let i = 0; i < summary5.events.length; i += 1) {
+        mergedEventIds.add(summary5.events[i].id);
+      }
+    }
+    if (summary2) {
+      for (let i = 0; i < summary2.events.length; i += 1) {
+        mergedEventIds.add(summary2.events[i].id);
+      }
+    }
+    const mergedEvents: DisasterEvent[] = [];
+    if (mergedEventIds.size > 0) {
+      for (let i = 0; i < events.length; i += 1) {
+        const event = events[i];
+        if (mergedEventIds.has(event.id)) {
+          mergedEvents.push(event);
+        }
+      }
+    }
     const tokens = buildEmojiTokens(mergedKindLevels, MAX_EMOJI_PER_LABEL);
     if (tokens.length === 0) {
       continue;
@@ -337,6 +387,7 @@ export const buildRegionEmojiLabels = (
       level,
       tokens,
       size: EMOJI_SIZES[level] ?? 12,
+      events: mergedEvents,
     });
   }
   return labels;
@@ -366,6 +417,18 @@ const getMarkerLayout = (marker: EmojiMarker): MarkerLayout => {
   const width = columnCount * marker.size + (columnCount - 1) * gap;
   const height = rowCount * marker.size + (rowCount - 1) * gap;
   return { columnCount, rowCount, gap, width, height };
+};
+
+export const getEmojiMarkerBounds = (marker: EmojiMarker, padding = 0): MarkerBounds => {
+  const layout = getMarkerLayout(marker);
+  const halfWidth = layout.width / 2 + padding;
+  const halfHeight = layout.height / 2 + padding;
+  return {
+    left: marker.x - halfWidth,
+    top: marker.y - halfHeight,
+    right: marker.x + halfWidth,
+    bottom: marker.y + halfHeight,
+  };
 };
 
 const getMarkerStyle = (

@@ -1,4 +1,4 @@
-import type { EventLevels } from '../types';
+import type { DisasterEvent, EventLevels } from '../types';
 
 export type RegionLevels = {
   codes2: Map<string, EventLevels>;
@@ -43,6 +43,7 @@ export type EmojiLabel = {
   level: EventLevels;
   tokens: string[];
   size: number;
+  events: DisasterEvent[];
 };
 
 export type EmojiMarker = {
