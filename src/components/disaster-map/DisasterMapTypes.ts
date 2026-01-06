@@ -52,6 +52,7 @@ export type EmojiMarker = {
   x: number;
   y: number;
   size: number;
+  level: EventLevels;
 };
 
 export type PulsePoint = {

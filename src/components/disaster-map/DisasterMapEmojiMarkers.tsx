@@ -47,7 +47,6 @@ export type MarkerBounds = {
 type MarkerVariantStyle = {
   fontWeight: number;
   textShadow: string;
-  zIndex: number;
 };
 
 type DisasterMapEmojiMarkersProps = {
@@ -72,12 +71,10 @@ const MARKER_VARIANTS: Record<EmojiMarkerVariant, MarkerVariantStyle> = {
   region: {
     fontWeight: 600,
     textShadow: '0 0 6px rgba(6, 10, 18, 0.6), 0 0 10px rgba(6, 10, 18, 0.35)',
-    zIndex: 10,
   },
   point: {
     fontWeight: 700,
     textShadow: '0 0 6px rgba(6, 10, 18, 0.7), 0 0 12px rgba(6, 10, 18, 0.45)',
-    zIndex: 20,
   },
 };
 
@@ -404,6 +401,7 @@ export const projectEmojiMarkers = (labels: EmojiLabel[], map: MaplibreMap): Emo
       x: point.x,
       y: point.y,
       size: label.size,
+      level: label.level,
     });
   }
   return markers;
@@ -446,7 +444,7 @@ const getMarkerStyle = (
   lineHeight: 1,
   color: MARKER_COLOR,
   textShadow: variantStyle.textShadow,
-  zIndex: variantStyle.zIndex,
+  zIndex: marker.level,
   display: 'grid',
   placeItems: 'center',
   gridTemplateColumns: `repeat(${layout.columnCount}, ${marker.size}px)`,
