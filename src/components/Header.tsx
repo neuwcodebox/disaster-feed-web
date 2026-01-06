@@ -42,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
             <span className="text-[7px] font-black text-slate-500 uppercase leading-none tracking-tighter">DATA</span>
             <span className="text-[7px] font-black text-slate-500 uppercase leading-none tracking-tighter">STATUS</span>
           </div>
-          <div className="flex flex-wrap items-start justify-center gap-x-2 gap-y-1 md:gap-x-2.5 md:gap-y-1.5 min-w-0">
+          <div className="flex flex-wrap items-start justify-center gap-x-1 gap-y-1 md:gap-x-1.5 md:gap-y-1.5 min-w-0">
             {sourceStatuses.map((source) => (
               <div key={source.sourceId} className="flex flex-col items-center min-w-0">
                 <div
