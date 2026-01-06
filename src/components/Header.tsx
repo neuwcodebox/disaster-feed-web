@@ -42,11 +42,11 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
             <span className="text-[7px] font-black text-slate-500 uppercase leading-none tracking-tighter">DATA</span>
             <span className="text-[7px] font-black text-slate-500 uppercase leading-none tracking-tighter">STATUS</span>
           </div>
-          <div className="flex flex-wrap items-start justify-center gap-x-1 gap-y-1 md:gap-x-1.5 md:gap-y-1.5 min-w-0">
+          <div className="flex flex-wrap items-start justify-center gap-x-1 gap-y-0.5 md:gap-x-1.5 md:gap-y-1 min-w-0">
             {sourceStatuses.map((source) => (
               <div key={source.sourceId} className="flex flex-col items-center min-w-0">
                 <div
-                  className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full mb-0.5 transition-all duration-500 ${
+                  className={`w-1 h-1 md:w-2 md:h-2 rounded-full mb-0.5 transition-all duration-500 ${
                     source.isConnected
                       ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.55)]'
                       : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.55)] animate-pulse'
