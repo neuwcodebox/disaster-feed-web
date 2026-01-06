@@ -40,6 +40,11 @@ const schemaSourcesResponse = z.object({
 });
 
 export type ApiEvent = z.infer<typeof schemaEvent>;
+type EventsQueryOptions = {
+  kind?: number;
+  limit?: number;
+  since?: Date;
+};
 
 const resolveBaseUrl = (): string => {
   if (!apiBaseUrl) {
@@ -126,24 +131,20 @@ export const fetchSourceStatuses = async (): Promise<SourceStatus[]> => {
   return mapped;
 };
 
-export const fetchInitialEvents = async (limit = 10): Promise<ApiEvent[]> => {
+export const fetchEvents = async (options?: EventsQueryOptions): Promise<ApiEvent[]> => {
+  const { kind, limit = 10, since } = options ?? {};
   const url = new URL(buildApiUrl('/api/events'));
-  url.searchParams.set('limit', limit.toString());
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`Failed to fetch initial events: ${response.status}`);
+  if (kind != null) {
+    url.searchParams.set('kind', kind.toString());
   }
-  const payload = z.array(schemaEvent).parse(await response.json());
-  return payload;
-};
-
-export const fetchEventsByKind = async (kind: number, limit = 10): Promise<ApiEvent[]> => {
-  const url = new URL(buildApiUrl('/api/events'));
-  url.searchParams.set('kind', kind.toString());
   url.searchParams.set('limit', limit.toString());
+  if (since) {
+    url.searchParams.set('since', since.toISOString());
+  }
   const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new Error(`Failed to fetch events by kind ${kind}: ${response.status}`);
+    const kindSuffix = kind != null ? ` (kind ${kind})` : '';
+    throw new Error(`Failed to fetch events${kindSuffix}: ${response.status}`);
   }
   const payload = z.array(schemaEvent).parse(await response.json());
   return payload;

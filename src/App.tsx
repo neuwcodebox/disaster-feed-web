@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type ApiEvent,
   createEventSource,
-  fetchEventsByKind,
-  fetchInitialEvents,
+  fetchEvents,
   fetchSourceStatuses,
   parseEventData,
   toDisasterEvent,
@@ -270,10 +269,11 @@ const App: React.FC = () => {
 
     const loadInitialEvents = async () => {
       try {
-        const allEventsPromise = fetchInitialEvents();
+        const since = new Date(Date.now() - MAX_EVENT_AGE_MS);
+        const allEventsPromise = fetchEvents({ since });
         const kindPromises: Promise<ApiEvent[]>[] = [];
         for (let i = 0; i < EVENT_KIND_VALUES.length; i += 1) {
-          kindPromises.push(fetchEventsByKind(EVENT_KIND_VALUES[i], MAX_EVENTS_PER_CATEGORY));
+          kindPromises.push(fetchEvents({ kind: EVENT_KIND_VALUES[i], limit: MAX_EVENTS_PER_CATEGORY, since }));
         }
         const [allEvents, kindResults] = await Promise.all([allEventsPromise, Promise.allSettled(kindPromises)]);
         if (!isActive) {
