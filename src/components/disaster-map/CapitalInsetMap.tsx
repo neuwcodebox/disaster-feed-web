@@ -530,7 +530,7 @@ const CapitalInsetMap: React.FC<CapitalInsetMapProps> = ({
             );
           })}
         </div>
-        <div className="absolute left-2 top-2 rounded-full border border-slate-600/70 bg-slate-900/80 px-2 py-0.5 text-[10px] font-semibold text-slate-100">
+        <div className="absolute left-2 top-2 z-50 rounded-full border border-slate-600/70 bg-slate-900/80 px-2 py-0.5 text-[10px] font-semibold text-slate-100">
           수도권
         </div>
       </div>
