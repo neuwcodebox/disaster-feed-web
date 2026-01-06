@@ -131,6 +131,9 @@ const EmojiMarkerPopup: React.FC<EmojiMarkerPopupProps> = ({
               </span>
               <div className="min-w-0">
                 <div className="truncate text-xs font-semibold text-slate-100">{event.title}</div>
+                {event.content && (
+                  <div className="mt-0.5 truncate text-[10px] font-medium text-slate-400">{event.content}</div>
+                )}
                 <div className="text-[10px] font-medium text-slate-400">
                   {formatRelativeTime(event.timestamp)} · {event.source}
                 </div>
