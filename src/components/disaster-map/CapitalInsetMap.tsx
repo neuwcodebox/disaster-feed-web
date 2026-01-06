@@ -47,6 +47,7 @@ type EmojiMarker = {
   x: number;
   y: number;
   size: number;
+  level: number;
 };
 
 type PulseRegionLookup = {
@@ -219,6 +220,7 @@ const buildInsetMarkers = (labels: EmojiLabel[], bounds: GeoBounds, size: InsetS
       x,
       y,
       size: Math.max(8, Math.round(label.size * scale)),
+      level: label.level,
     });
   }
   return markers;
@@ -454,7 +456,7 @@ const CapitalInsetMap: React.FC<CapitalInsetMapProps> = ({
                   lineHeight: 1,
                   color: '#f8fafc',
                   textShadow: '0 0 6px rgba(4, 8, 16, 0.7), 0 0 10px rgba(4, 8, 16, 0.45)',
-                  zIndex: 5,
+                  zIndex: marker.level,
                   display: 'grid',
                   placeItems: 'center',
                   gridTemplateColumns: `repeat(${columnCount}, ${marker.size}px)`,
@@ -501,7 +503,7 @@ const CapitalInsetMap: React.FC<CapitalInsetMapProps> = ({
                   lineHeight: 1,
                   color: '#f8fafc',
                   textShadow: '0 0 6px rgba(6, 10, 18, 0.7), 0 0 12px rgba(6, 10, 18, 0.45)',
-                  zIndex: 10,
+                  zIndex: marker.level,
                   display: 'grid',
                   placeItems: 'center',
                   gridTemplateColumns: `repeat(${columnCount}, ${marker.size}px)`,

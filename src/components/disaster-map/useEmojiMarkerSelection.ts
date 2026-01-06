@@ -24,24 +24,32 @@ type EmojiMarkerSelectionResult = {
 
 const EMOJI_MARKER_HIT_PADDING = 6;
 
-const findEmojiMarkerAtPoint = (markers: EmojiMarker[], point: ScreenPoint, padding: number): EmojiMarker | null => {
-  let best: EmojiMarker | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
+type MarkerWithRenderOrder = {
+  marker: EmojiMarker;
+  renderOrder: number;
+};
+
+const findTopmostEmojiMarkerAtPoint = (
+  markers: MarkerWithRenderOrder[],
+  point: ScreenPoint,
+  padding: number,
+): EmojiMarker | null => {
+  let best: MarkerWithRenderOrder | null = null;
   for (let i = 0; i < markers.length; i += 1) {
-    const marker = markers[i];
-    const bounds = getEmojiMarkerBounds(marker, padding);
+    const candidate = markers[i];
+    const bounds = getEmojiMarkerBounds(candidate.marker, padding);
     if (point.x < bounds.left || point.x > bounds.right || point.y < bounds.top || point.y > bounds.bottom) {
       continue;
     }
-    const dx = point.x - marker.x;
-    const dy = point.y - marker.y;
-    const distance = dx * dx + dy * dy;
-    if (!best || distance < bestDistance) {
-      best = marker;
-      bestDistance = distance;
+    if (
+      !best ||
+      candidate.marker.level > best.marker.level ||
+      (candidate.marker.level === best.marker.level && candidate.renderOrder > best.renderOrder)
+    ) {
+      best = candidate;
     }
   }
-  return best;
+  return best?.marker ?? null;
 };
 
 export const useEmojiMarkerSelection = ({
@@ -53,16 +61,19 @@ export const useEmojiMarkerSelection = ({
   hitPadding = EMOJI_MARKER_HIT_PADDING,
 }: EmojiMarkerSelectionArgs): EmojiMarkerSelectionResult => {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
-  const pointMarkersRef = useRef<EmojiMarker[]>(pointMarkers);
-  const regionMarkersRef = useRef<EmojiMarker[]>(regionMarkers);
+  const renderOrderRef = useRef<MarkerWithRenderOrder[]>([]);
 
   useEffect(() => {
-    pointMarkersRef.current = pointMarkers;
-  }, [pointMarkers]);
-
-  useEffect(() => {
-    regionMarkersRef.current = regionMarkers;
-  }, [regionMarkers]);
+    const combined: MarkerWithRenderOrder[] = [];
+    for (let i = 0; i < regionMarkers.length; i += 1) {
+      combined.push({ marker: regionMarkers[i], renderOrder: i });
+    }
+    const offset = combined.length;
+    for (let i = 0; i < pointMarkers.length; i += 1) {
+      combined.push({ marker: pointMarkers[i], renderOrder: offset + i });
+    }
+    renderOrderRef.current = combined;
+  }, [pointMarkers, regionMarkers]);
 
   const labelById = useMemo(() => {
     const labelMap = new Map<string, EmojiLabel>();
@@ -90,8 +101,7 @@ export const useEmojiMarkerSelection = ({
       return;
     }
     const handleMapClick = (event: MapMouseEvent) => {
-      const pointHit = findEmojiMarkerAtPoint(pointMarkersRef.current, event.point, hitPadding);
-      const hit = pointHit ? pointHit : findEmojiMarkerAtPoint(regionMarkersRef.current, event.point, hitPadding);
+      const hit = findTopmostEmojiMarkerAtPoint(renderOrderRef.current, event.point, hitPadding);
       setSelectedMarkerId((prev) => {
         if (!hit) {
           return null;
