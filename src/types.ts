@@ -63,6 +63,7 @@ export enum EventSources {
   NctcTerrorAlert = 12,
   KpxPowerSupply = 13,
   FloodAlert = 14,
+  ForestFireWarning = 15,
 }
 
 export type EventGeo = {
