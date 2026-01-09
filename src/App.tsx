@@ -1,17 +1,6 @@
 import { Map as MapIcon } from 'lucide-react';
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  type ApiEvent,
-  type ApiEventMetric,
-  createEventSource,
-  fetchEventMetrics,
-  fetchEvents,
-  fetchSourceStatuses,
-  parseEventData,
-  toDisasterEvent,
-  toEventMetric,
-} from './api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import CategoryGrid from './components/CategoryGrid';
 import DisasterMap from './components/disaster-map/DisasterMap';
 import FooterMarquee from './components/FooterMarquee';
@@ -19,139 +8,23 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import UpdateNotifier from './components/UpdateNotifier';
 import {
-  EVENT_KIND_VALUES,
-  EVENT_LEVEL_SOUNDS,
-  MAX_CATEGORIES_DISPLAY,
-  SIDEBAR_MIN_LEVEL,
-  SOURCE_DISPLAY_ORDER,
-  STATUS_SOURCE_LABELS,
-} from './constants';
-import {
-  type CategoryGroup,
-  type CategorySortMode,
-  type DisasterEvent,
-  EventLevels,
-  type EventMetric,
-  type SourceStatus,
-} from './types';
-import { filterEventsByAge } from './utils/eventFilters';
-
-const createInitialSourceStatuses = (): SourceStatus[] => {
-  const initial: SourceStatus[] = [];
-  for (let i = 0; i < SOURCE_DISPLAY_ORDER.length; i += 1) {
-    const sourceId = SOURCE_DISPLAY_ORDER[i];
-    initial.push({
-      sourceId,
-      name: STATUS_SOURCE_LABELS[sourceId] ?? `#${sourceId}`,
-      isConnected: false,
-      lastUpdate: 0,
-    });
-  }
-  return initial;
-};
-
-const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
-const MAX_EVENTS_PER_CATEGORY = 50;
-const METRICS_FETCH_LIMIT = 2000;
-const METRICS_WINDOW_MS = 24 * 60 * 60 * 1000;
-const ALERT_SOUND_WINDOW_MS = 1000;
-const ALERT_SOUND_MIN_LEVEL = EventLevels.Moderate;
-const MAP_LARGE_SCREEN_QUERY = '(min-width: 1536px)';
-const ALERT_SOUND_LEVELS: EventLevels[] = [EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
-const LEVEL_BASE_SCORES: Record<EventLevels, number> = {
-  [EventLevels.Info]: 10,
-  [EventLevels.Minor]: 20,
-  [EventLevels.Moderate]: 40,
-  [EventLevels.Severe]: 80,
-  [EventLevels.Critical]: 160,
-};
-const SCORE_DECAY_PER_MINUTE = 1;
-const SCORE_RESORT_INTERVAL_MS = 15000;
-const MAX_EVENT_AGE_MS = 3 * 24 * 60 * 60 * 1000;
-
-const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number => {
-  if (a.timestamp !== b.timestamp) {
-    return b.timestamp - a.timestamp;
-  }
-  return b.id.localeCompare(a.id);
-};
-
-const compareMetricsByOccurrence = (a: EventMetric, b: EventMetric): number => {
-  if (a.timestamp !== b.timestamp) {
-    return b.timestamp - a.timestamp;
-  }
-  return b.id.localeCompare(a.id);
-};
-
-const getEventScore = (event: DisasterEvent, nowMs: number): number => {
-  const baseScore = LEVEL_BASE_SCORES[event.level] ?? 0;
-  const elapsedMinutes = Math.max(0, (nowMs - event.timestamp) / 60000);
-  return baseScore - elapsedMinutes * SCORE_DECAY_PER_MINUTE;
-};
-
-const compareEventsByScore =
-  (nowMs: number) =>
-  (a: DisasterEvent, b: DisasterEvent): number => {
-    const scoreDiff = getEventScore(b, nowMs) - getEventScore(a, nowMs);
-    if (scoreDiff !== 0) {
-      return scoreDiff;
-    }
-    return compareEventsByOccurrence(a, b);
-  };
-
-const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): DisasterEvent[] => {
-  const counts = new Map<string, number>();
-  const limited: DisasterEvent[] = [];
-  for (let i = 0; i < items.length; i += 1) {
-    const event = items[i];
-    const count = counts.get(event.category) ?? 0;
-    if (count >= maxPerCategory) {
-      continue;
-    }
-    counts.set(event.category, count + 1);
-    limited.push(event);
-  }
-  return limited;
-};
-
-const insertSorted = <T,>(items: T[], item: T, compare: (left: T, right: T) => number): T[] => {
-  const next = items.slice();
-  let insertIndex = next.length;
-  for (let i = 0; i < next.length; i += 1) {
-    if (compare(item, next[i]) < 0) {
-      insertIndex = i;
-      break;
-    }
-  }
-  next.splice(insertIndex, 0, item);
-  return next;
-};
-
-const toMetricFromEvent = (event: DisasterEvent): EventMetric => ({
-  id: event.id,
-  category: event.category,
-  level: event.level,
-  timestamp: event.timestamp,
-});
-
-const filterMetricsByAge = (items: EventMetric[], nowMs: number): EventMetric[] => {
-  const threshold = nowMs - METRICS_WINDOW_MS;
-  const filtered: EventMetric[] = [];
-  // timestamp 내림차순 정렬을 전제로 오래된 구간에서 빠르게 종료합니다.
-  for (let i = 0; i < items.length; i += 1) {
-    const metric = items[i];
-    if (metric.timestamp < threshold) {
-      break;
-    }
-    filtered.push(metric);
-  }
-  return filtered;
-};
+  MAP_LARGE_SCREEN_QUERY,
+  MAX_EVENT_AGE_MS,
+  MAX_EVENTS_PER_CATEGORY,
+  METRICS_FETCH_LIMIT,
+  METRICS_WINDOW_MS,
+  SCORE_RESORT_INTERVAL_MS,
+  SIDEBAR_EVENT_LIMIT,
+} from './config/appRuntime';
+import { MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL } from './constants';
+import { useAlertSound } from './hooks/useAlertSound';
+import { useDisasterStream } from './hooks/useDisasterStream';
+import type { CategoryGroup, CategorySortMode, DisasterEvent, EventMetric } from './types';
+import { EventLevels } from './types';
+import { filterEventsByAge, filterMetricsByAge } from './utils/eventFilters';
+import { compareEventsByOccurrence, compareEventsByScore } from './utils/eventProcessing';
 
 const App: React.FC = () => {
-  const [events, setEvents] = useState<DisasterEvent[]>([]);
-  const [metrics, setMetrics] = useState<EventMetric[]>([]);
-  const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
   const [isMuted, setIsMuted] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
@@ -162,29 +35,15 @@ const App: React.FC = () => {
   });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [categorySortMode, setCategorySortMode] = useState<CategorySortMode>('score');
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const lastEventIdRef = useRef<string | null>(null);
-  const alertSoundsRef = useRef<Partial<Record<EventLevels, HTMLAudioElement>> | null>(null);
-  const alertCooldownTimerRef = useRef<number | null>(null);
-  const pendingAlertLevelRef = useRef<EventLevels | null>(null);
 
-  const prepareAlertSounds = useCallback(() => {
-    if (alertSoundsRef.current) {
-      return;
-    }
-    const sounds: Partial<Record<EventLevels, HTMLAudioElement>> = {};
-    for (let i = 0; i < ALERT_SOUND_LEVELS.length; i += 1) {
-      const level = ALERT_SOUND_LEVELS[i];
-      const source = EVENT_LEVEL_SOUNDS[level];
-      if (!source) {
-        continue;
-      }
-      const audio = new Audio(source);
-      audio.preload = 'auto';
-      sounds[level] = audio;
-    }
-    alertSoundsRef.current = sounds;
-  }, []);
+  const { handleAlertLevel } = useAlertSound({ isMuted });
+  const { events, metrics, sourceStatuses } = useDisasterStream({
+    maxEventAgeMs: MAX_EVENT_AGE_MS,
+    metricsWindowMs: METRICS_WINDOW_MS,
+    metricsFetchLimit: METRICS_FETCH_LIMIT,
+    maxEventsPerCategory: MAX_EVENTS_PER_CATEGORY,
+    onAlertLevel: handleAlertLevel,
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -201,122 +60,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const toggleMap = useCallback(() => {
-    setIsMapOpen((prev) => !prev);
-  }, []);
-
-  const closeMap = useCallback(() => {
-    setIsMapOpen(false);
-  }, []);
-
-  const playAlertSound = useCallback(
-    (level: EventLevels) => {
-      if (isMuted) {
-        return;
-      }
-      prepareAlertSounds();
-      const audio = alertSoundsRef.current?.[level];
-      if (!audio) {
-        return;
-      }
-      audio.currentTime = 0;
-      void audio.play().catch((error: unknown) => {
-        console.warn('알림음을 재생하지 못했습니다.', error);
-      });
-    },
-    [isMuted, prepareAlertSounds],
-  );
-
-  const scheduleAlertWindow = useCallback(() => {
-    if (alertCooldownTimerRef.current) {
-      return;
-    }
-    alertCooldownTimerRef.current = window.setTimeout(() => {
-      alertCooldownTimerRef.current = null;
-      const pendingLevel = pendingAlertLevelRef.current;
-      pendingAlertLevelRef.current = null;
-      if (pendingLevel != null) {
-        playAlertSound(pendingLevel);
-      }
-    }, ALERT_SOUND_WINDOW_MS);
-  }, [playAlertSound]);
-
-  const handleAlertLevel = useCallback(
-    (level: EventLevels) => {
-      if (level < ALERT_SOUND_MIN_LEVEL) {
-        return;
-      }
-      const pendingLevel = pendingAlertLevelRef.current;
-      if (pendingLevel == null || level > pendingLevel) {
-        pendingAlertLevelRef.current = level;
-      }
-      scheduleAlertWindow();
-    },
-    [scheduleAlertWindow],
-  );
-
-  const handleIncomingEvent = useCallback(
-    (message: MessageEvent<string>) => {
-      const parsed = parseEventData(message.data);
-      if (!parsed) {
-        return;
-      }
-      const mappedEvent = toDisasterEvent(parsed, true);
-      const eventId = message.lastEventId || parsed.id;
-      if (eventId) {
-        lastEventIdRef.current = eventId;
-      }
-      handleAlertLevel(mappedEvent.level);
-      const now = Date.now();
-      setEvents((prev) => {
-        for (let i = 0; i < prev.length; i += 1) {
-          if (prev[i].id === mappedEvent.id) {
-            return prev;
-          }
-        }
-        const next = insertSorted(prev, mappedEvent, compareEventsByOccurrence);
-        const recent = filterEventsByAge(next, now, MAX_EVENT_AGE_MS);
-        return limitEventsByCategory(recent, MAX_EVENTS_PER_CATEGORY);
-      });
-      const metric = toMetricFromEvent(mappedEvent);
-      setMetrics((prev) => {
-        for (let i = 0; i < prev.length; i += 1) {
-          if (prev[i].id === metric.id) {
-            return prev;
-          }
-        }
-        return insertSorted(prev, metric, compareMetricsByOccurrence);
-      });
-      setSourceStatuses((prev) => {
-        const next = prev.slice();
-        for (let i = 0; i < next.length; i += 1) {
-          if (next[i].sourceId === mappedEvent.sourceId) {
-            next[i] = { ...next[i], isConnected: true, lastUpdate: now };
-            return next;
-          }
-        }
-        return [
-          ...next,
-          {
-            sourceId: mappedEvent.sourceId,
-            name: mappedEvent.source,
-            isConnected: true,
-            lastUpdate: now,
-          },
-        ];
-      });
-    },
-    [handleAlertLevel],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (alertCooldownTimerRef.current) {
-        window.clearTimeout(alertCooldownTimerRef.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
@@ -326,151 +69,16 @@ const App: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let isActive = true;
+  const toggleMap = useCallback(() => {
+    setIsMapOpen((prev) => !prev);
+  }, []);
 
-    const loadInitialEvents = async () => {
-      try {
-        const eventsSince = new Date(Date.now() - MAX_EVENT_AGE_MS);
-        const metricsSince = new Date(Date.now() - METRICS_WINDOW_MS);
-        const allEventsPromise = fetchEvents({ since: eventsSince });
-        const eventKindPromises: Promise<ApiEvent[]>[] = [];
-        const metricKindPromises: Promise<ApiEventMetric[]>[] = [];
-        for (let i = 0; i < EVENT_KIND_VALUES.length; i += 1) {
-          const kind = EVENT_KIND_VALUES[i];
-          eventKindPromises.push(fetchEvents({ kind, limit: MAX_EVENTS_PER_CATEGORY, since: eventsSince }));
-          metricKindPromises.push(fetchEventMetrics({ kind, limit: METRICS_FETCH_LIMIT, since: metricsSince }));
-        }
-        const [allEvents, eventsKindResults, metricsKindResults] = await Promise.all([
-          allEventsPromise,
-          Promise.allSettled(eventKindPromises),
-          Promise.allSettled(metricKindPromises),
-        ]);
-        if (!isActive) {
-          return;
-        }
-        const combined: ApiEvent[] = [];
-        for (let i = 0; i < allEvents.length; i += 1) {
-          combined.push(allEvents[i]);
-        }
-        for (let i = 0; i < eventsKindResults.length; i += 1) {
-          const result = eventsKindResults[i];
-          if (result.status === 'fulfilled') {
-            for (let j = 0; j < result.value.length; j += 1) {
-              combined.push(result.value[j]);
-            }
-          } else {
-            console.warn('Failed to fetch events by kind', result.reason);
-          }
-        }
-        const mappedById = new Map<string, DisasterEvent>();
-        for (let i = 0; i < combined.length; i += 1) {
-          const mappedEvent = toDisasterEvent(combined[i]);
-          const existing = mappedById.get(mappedEvent.id);
-          if (!existing || mappedEvent.timestamp > existing.timestamp) {
-            mappedById.set(mappedEvent.id, mappedEvent);
-          }
-        }
-        const mapped = Array.from(mappedById.values());
-        mapped.sort(compareEventsByOccurrence);
-        const recent = filterEventsByAge(mapped, Date.now(), MAX_EVENT_AGE_MS);
-        setEvents(limitEventsByCategory(recent, MAX_EVENTS_PER_CATEGORY));
-        const metricsSeed: EventMetric[] = [];
-        let hasMetricsResponse = false;
-        const missingMetricKinds: number[] = [];
-        for (let i = 0; i < metricsKindResults.length; i += 1) {
-          const result = metricsKindResults[i];
-          const kind = EVENT_KIND_VALUES[i];
-          if (result.status === 'fulfilled') {
-            hasMetricsResponse = true;
-            for (let j = 0; j < result.value.length; j += 1) {
-              metricsSeed.push(toEventMetric(result.value[j]));
-            }
-          } else {
-            missingMetricKinds.push(kind);
-            console.warn('Failed to fetch event metrics by kind', kind, result.reason);
-          }
-        }
-        if (!hasMetricsResponse) {
-          for (let i = 0; i < mapped.length; i += 1) {
-            metricsSeed.push(toMetricFromEvent(mapped[i]));
-          }
-        } else if (missingMetricKinds.length > 0) {
-          const missingKindSet = new Set(missingMetricKinds);
-          for (let i = 0; i < mapped.length; i += 1) {
-            const event = mapped[i];
-            if (missingKindSet.has(event.kind)) {
-              metricsSeed.push(toMetricFromEvent(event));
-            }
-          }
-        }
-        metricsSeed.sort(compareMetricsByOccurrence);
-        setMetrics(metricsSeed);
-        if (mapped.length > 0) {
-          lastEventIdRef.current = mapped[0].id;
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    const connectStream = (afterId?: string) => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-      const stream = createEventSource(afterId);
-      eventSourceRef.current = stream;
-      stream.onmessage = handleIncomingEvent;
-    };
-
-    const startStream = async () => {
-      await loadInitialEvents();
-      if (!isActive) {
-        return;
-      }
-      connectStream(lastEventIdRef.current ?? undefined);
-    };
-
-    void startStream();
-
-    return () => {
-      isActive = false;
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, [handleIncomingEvent]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    const loadStatuses = async () => {
-      try {
-        const nextStatuses = await fetchSourceStatuses();
-        if (isActive) {
-          setSourceStatuses(nextStatuses);
-        }
-      } catch (error) {
-        console.error(error);
-        if (isActive) {
-          setSourceStatuses((prev) => prev.map((status) => ({ ...status, isConnected: false })));
-        }
-      }
-    };
-
-    void loadStatuses();
-    const intervalId = window.setInterval(() => {
-      void loadStatuses();
-    }, 20000);
-
-    return () => {
-      isActive = false;
-      window.clearInterval(intervalId);
-    };
+  const closeMap = useCallback(() => {
+    setIsMapOpen(false);
   }, []);
 
   const recentEvents = useMemo(() => filterEventsByAge(events, nowMs, MAX_EVENT_AGE_MS), [events, nowMs]);
-  const recentMetrics = useMemo(() => filterMetricsByAge(metrics, nowMs), [metrics, nowMs]);
+  const recentMetrics = useMemo(() => filterMetricsByAge(metrics, nowMs, METRICS_WINDOW_MS), [metrics, nowMs]);
 
   const metricsByCategory = useMemo(() => {
     const grouped: Record<string, EventMetric[]> = {};
@@ -498,7 +106,7 @@ const App: React.FC = () => {
     }
     const next = filtered.slice();
     next.sort(compareEventsByScore(nowMs));
-    return next.slice(0, 30);
+    return next.slice(0, SIDEBAR_EVENT_LIMIT);
   }, [nowMs, recentEvents]);
 
   const categoryGroups = useMemo(() => {
