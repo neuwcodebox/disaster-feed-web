@@ -149,12 +149,15 @@ export const useDisasterStream = ({
       if (!parsed) {
         return;
       }
+
       const mappedEvent = toDisasterEvent(parsed, true);
       const eventId = message.lastEventId || parsed.id;
       if (eventId) {
         lastEventIdRef.current = eventId;
       }
+
       onAlertLevel(mappedEvent.level);
+
       const now = Date.now();
       setEvents((prev) => {
         if (hasItemId(prev, mappedEvent.id)) {
@@ -164,16 +167,18 @@ export const useDisasterStream = ({
         const recent = filterEventsByAge(next, now, maxEventAgeMs);
         return limitEventsByCategory(recent, maxEventsPerCategory);
       });
+
       const metric = toMetricFromEvent(mappedEvent);
       setMetrics((prev) => {
         if (hasItemId(prev, metric.id)) {
           return prev;
         }
-        return insertSorted(prev, metric, compareMetricsByOccurrence);
+        const next = insertSorted(prev, metric, compareMetricsByOccurrence);
+        return filterMetricsByAge(next, now, metricsWindowMs);
       });
       setSourceStatuses((prev) => updateSourceStatuses(prev, mappedEvent, now));
     },
-    [maxEventAgeMs, maxEventsPerCategory, onAlertLevel],
+    [maxEventAgeMs, maxEventsPerCategory, metricsWindowMs, onAlertLevel],
   );
 
   useEffect(() => {
