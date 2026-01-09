@@ -4,6 +4,7 @@ import type React from 'react';
 import { getEventKindIcon, LEVEL_CONFIG } from '../constants';
 import { type CategoryGroup, type CategorySortMode, EventLevels } from '../types';
 import CategoryEventCard from './CategoryEventCard';
+import CategorySparkline from './CategorySparkline';
 
 interface CategoryGridProps {
   groups: CategoryGroup[];
@@ -80,16 +81,21 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortMod
                 className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-lg h-70 md:h-80 lg:h-full"
               >
                 {/* Category Header - Fixed Height */}
-                <div className="h-10 md:h-12 px-3 md:px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-800/30 shrink-0">
+                <div className="gap-2 h-10 md:h-12 px-3 md:px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-800/30 shrink-0">
                   <div className="flex items-center space-x-2">
                     <div
                       className={`w-2 h-2 md:w-2.5 md:h-2.5 rounded-full ${LEVEL_CONFIG[highestLevel].bg} shadow-sm animate-pulse`}
                     />
-                    <h3 className="text-base md:text-lg font-bold text-white tracking-tight">{group.category}</h3>
+                    <h3 className="text-base md:text-lg font-bold text-white tracking-tight whitespace-nowrap">
+                      {group.category}
+                    </h3>
                   </div>
-                  <span className="text-sm md:text-base leading-none" aria-hidden="true">
-                    {getEventKindIcon(group.latestEvent.kind)}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CategorySparkline events={group.events} hours={24} />
+                    <span className="text-sm md:text-base leading-none" aria-hidden="true">
+                      {getEventKindIcon(group.latestEvent.kind)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Event List */}
