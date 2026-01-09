@@ -34,6 +34,7 @@ type InitialLoadResult = {
   events: DisasterEvent[];
   metrics: EventMetric[];
   lastEventId: string | null;
+  knownEventCache: Map<string, number>;
 };
 
 const hasItemId = <T extends { id: string }>(items: T[], targetId: string): boolean => {
@@ -61,6 +62,31 @@ const mergeEvents = (allEvents: ApiEvent[], kindResults: PromiseSettledResult<Ap
     }
   }
   return combined;
+};
+
+const buildKnownEventCache = (items: DisasterEvent[]): Map<string, number> => {
+  const cache = new Map<string, number>();
+  for (let i = 0; i < items.length; i += 1) {
+    const event = items[i];
+    cache.set(event.id, event.timestamp);
+  }
+  return cache;
+};
+
+const pruneKnownEventCache = (cache: Map<string, number>, now: number, maxAgeMs: number) => {
+  if (maxAgeMs <= 0) {
+    return;
+  }
+  const threshold = now - maxAgeMs;
+  const staleIds: string[] = [];
+  for (const [id, timestamp] of cache) {
+    if (timestamp < threshold) {
+      staleIds.push(id);
+    }
+  }
+  for (let i = 0; i < staleIds.length; i += 1) {
+    cache.delete(staleIds[i]);
+  }
 };
 
 const dedupeAndMapEvents = (items: ApiEvent[]): DisasterEvent[] => {
@@ -142,6 +168,13 @@ export const useDisasterStream = ({
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastEventIdRef = useRef<string | null>(null);
+  const knownEventCacheRef = useRef<Map<string, number>>(new Map());
+  const onAlertLevelRef = useRef(onAlertLevel);
+  const maxKnownAgeMs = Math.max(maxEventAgeMs, metricsWindowMs);
+
+  useEffect(() => {
+    onAlertLevelRef.current = onAlertLevel;
+  }, [onAlertLevel]);
 
   const handleIncomingEvent = useCallback(
     (message: MessageEvent<string>) => {
@@ -156,9 +189,18 @@ export const useDisasterStream = ({
         lastEventIdRef.current = eventId;
       }
 
-      onAlertLevel(mappedEvent.level);
-
       const now = Date.now();
+      const knownEventCache = knownEventCacheRef.current;
+      if (knownEventCache.has(mappedEvent.id)) {
+        pruneKnownEventCache(knownEventCache, now, maxKnownAgeMs);
+        return;
+      }
+
+      knownEventCache.set(mappedEvent.id, mappedEvent.timestamp);
+      pruneKnownEventCache(knownEventCache, now, maxKnownAgeMs);
+
+      onAlertLevelRef.current(mappedEvent.level);
+
       setEvents((prev) => {
         if (hasItemId(prev, mappedEvent.id)) {
           return prev;
@@ -176,9 +218,10 @@ export const useDisasterStream = ({
         const next = insertSorted(prev, metric, compareMetricsByOccurrence);
         return filterMetricsByAge(next, now, metricsWindowMs);
       });
+
       setSourceStatuses((prev) => updateSourceStatuses(prev, mappedEvent, now));
     },
-    [maxEventAgeMs, maxEventsPerCategory, metricsWindowMs, onAlertLevel],
+    [maxEventAgeMs, maxEventsPerCategory, maxKnownAgeMs, metricsWindowMs],
   );
 
   useEffect(() => {
@@ -189,7 +232,9 @@ export const useDisasterStream = ({
         const now = Date.now();
         const eventsSince = new Date(now - maxEventAgeMs);
         const metricsSince = new Date(now - metricsWindowMs);
+
         const allEventsPromise = fetchEvents({ since: eventsSince });
+
         const eventKindPromises: Promise<ApiEvent[]>[] = [];
         const metricKindPromises: Promise<ApiEventMetric[]>[] = [];
         for (let i = 0; i < EVENT_KIND_VALUES.length; i += 1) {
@@ -197,22 +242,30 @@ export const useDisasterStream = ({
           eventKindPromises.push(fetchEvents({ kind, limit: maxEventsPerCategory, since: eventsSince }));
           metricKindPromises.push(fetchEventMetrics({ kind, limit: metricsFetchLimit, since: metricsSince }));
         }
+
         const [allEvents, eventsKindResults, metricsKindResults] = await Promise.all([
           allEventsPromise,
           Promise.allSettled(eventKindPromises),
           Promise.allSettled(metricKindPromises),
         ]);
+
         const combined = mergeEvents(allEvents, eventsKindResults);
         const mapped = dedupeAndMapEvents(combined);
         mapped.sort(compareEventsByOccurrence);
         const recent = filterEventsByAge(mapped, now, maxEventAgeMs);
         const limited = limitEventsByCategory(recent, maxEventsPerCategory);
+
         const metricsSeed = buildMetricsSeed(metricsKindResults, mapped);
         metricsSeed.sort(compareMetricsByOccurrence);
+
+        const knownEventCache = buildKnownEventCache(recent);
+        pruneKnownEventCache(knownEventCache, now, maxKnownAgeMs);
+
         return {
           events: limited,
           metrics: filterMetricsByAge(metricsSeed, now, metricsWindowMs),
-          lastEventId: mapped.length > 0 ? mapped[0].id : null,
+          lastEventId: allEvents.length > 0 ? allEvents[0].id : null,
+          knownEventCache,
         };
       } catch (error) {
         console.error(error);
@@ -237,6 +290,7 @@ export const useDisasterStream = ({
       setEvents(initial.events);
       setMetrics(initial.metrics);
       lastEventIdRef.current = initial.lastEventId;
+      knownEventCacheRef.current = initial.knownEventCache;
       connectStream(lastEventIdRef.current ?? undefined);
     };
 
@@ -248,7 +302,7 @@ export const useDisasterStream = ({
         eventSourceRef.current.close();
       }
     };
-  }, [handleIncomingEvent, maxEventAgeMs, maxEventsPerCategory, metricsFetchLimit, metricsWindowMs]);
+  }, [handleIncomingEvent, maxEventAgeMs, maxEventsPerCategory, metricsFetchLimit, metricsWindowMs, maxKnownAgeMs]);
 
   useEffect(() => {
     let isActive = true;
