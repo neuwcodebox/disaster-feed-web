@@ -20,7 +20,6 @@ import { MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL } from './constants';
 import { useAlertSound } from './hooks/useAlertSound';
 import { useDisasterStream } from './hooks/useDisasterStream';
 import type { CategoryGroup, CategorySortMode, DisasterEvent, EventMetric } from './types';
-import { EventLevels } from './types';
 import { filterEventsByAge, filterMetricsByAge } from './utils/eventFilters';
 import { compareEventsByOccurrence, compareEventsByScore } from './utils/eventProcessing';
 
@@ -93,14 +92,7 @@ const App: React.FC = () => {
   }, [recentMetrics]);
 
   const sidebarEvents = useMemo(() => {
-    const priorityMap = {
-      [EventLevels.Info]: 0,
-      [EventLevels.Minor]: 1,
-      [EventLevels.Moderate]: 2,
-      [EventLevels.Severe]: 3,
-      [EventLevels.Critical]: 4,
-    };
-    const filtered = recentEvents.filter((event) => priorityMap[event.level] >= priorityMap[SIDEBAR_MIN_LEVEL]);
+    const filtered = recentEvents.filter((event) => event.level >= SIDEBAR_MIN_LEVEL);
     if (filtered.length <= 1) {
       return filtered;
     }
