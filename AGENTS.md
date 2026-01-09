@@ -40,6 +40,7 @@
 - 타입에는 PascalCase, 변수/함수/메서드에는 camelCase, 상수에는 UPPER_SNAKE_CASE를 사용합니다.
 - enum 이름은 복수형으로 작성합니다.
 - Zod 스키마 변수는 schemaXXX 형태의 camelCase로 작성합니다.
+- 빈 줄을 사용하여 적절한 단위로 코드들이 구분되게 해주세요.
 
 ## Git commit style
 
