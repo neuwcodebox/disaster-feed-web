@@ -89,6 +89,13 @@ export interface DisasterEvent {
   isRealtime: boolean;
 }
 
+export type EventMetric = {
+  id: string;
+  category: string;
+  level: EventLevels;
+  timestamp: number;
+};
+
 export type CategoryGroup = {
   category: string;
   latestEvent: DisasterEvent;

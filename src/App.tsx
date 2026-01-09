@@ -3,11 +3,14 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type ApiEvent,
+  type ApiEventMetric,
   createEventSource,
+  fetchEventMetrics,
   fetchEvents,
   fetchSourceStatuses,
   parseEventData,
   toDisasterEvent,
+  toEventMetric,
 } from './api';
 import CategoryGrid from './components/CategoryGrid';
 import DisasterMap from './components/disaster-map/DisasterMap';
@@ -23,7 +26,14 @@ import {
   SOURCE_DISPLAY_ORDER,
   STATUS_SOURCE_LABELS,
 } from './constants';
-import { type CategoryGroup, type CategorySortMode, type DisasterEvent, EventLevels, type SourceStatus } from './types';
+import {
+  type CategoryGroup,
+  type CategorySortMode,
+  type DisasterEvent,
+  EventLevels,
+  type EventMetric,
+  type SourceStatus,
+} from './types';
 import { filterEventsByAge } from './utils/eventFilters';
 
 const createInitialSourceStatuses = (): SourceStatus[] => {
@@ -42,6 +52,8 @@ const createInitialSourceStatuses = (): SourceStatus[] => {
 
 const INITIAL_SOURCE_STATUSES = createInitialSourceStatuses();
 const MAX_EVENTS_PER_CATEGORY = 50;
+const METRICS_FETCH_LIMIT = 2000;
+const METRICS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const ALERT_SOUND_WINDOW_MS = 1000;
 const ALERT_SOUND_MIN_LEVEL = EventLevels.Moderate;
 const MAP_LARGE_SCREEN_QUERY = '(min-width: 1536px)';
@@ -58,6 +70,13 @@ const SCORE_RESORT_INTERVAL_MS = 15000;
 const MAX_EVENT_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
 const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number => {
+  if (a.timestamp !== b.timestamp) {
+    return b.timestamp - a.timestamp;
+  }
+  return b.id.localeCompare(a.id);
+};
+
+const compareMetricsByOccurrence = (a: EventMetric, b: EventMetric): number => {
   if (a.timestamp !== b.timestamp) {
     return b.timestamp - a.timestamp;
   }
@@ -95,8 +114,43 @@ const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): 
   return limited;
 };
 
+const insertSorted = <T,>(items: T[], item: T, compare: (left: T, right: T) => number): T[] => {
+  const next = items.slice();
+  let insertIndex = next.length;
+  for (let i = 0; i < next.length; i += 1) {
+    if (compare(item, next[i]) < 0) {
+      insertIndex = i;
+      break;
+    }
+  }
+  next.splice(insertIndex, 0, item);
+  return next;
+};
+
+const toMetricFromEvent = (event: DisasterEvent): EventMetric => ({
+  id: event.id,
+  category: event.category,
+  level: event.level,
+  timestamp: event.timestamp,
+});
+
+const filterMetricsByAge = (items: EventMetric[], nowMs: number): EventMetric[] => {
+  const threshold = nowMs - METRICS_WINDOW_MS;
+  const filtered: EventMetric[] = [];
+  // timestamp 내림차순 정렬을 전제로 오래된 구간에서 빠르게 종료합니다.
+  for (let i = 0; i < items.length; i += 1) {
+    const metric = items[i];
+    if (metric.timestamp < threshold) {
+      break;
+    }
+    filtered.push(metric);
+  }
+  return filtered;
+};
+
 const App: React.FC = () => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
+  const [metrics, setMetrics] = useState<EventMetric[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
   const [isMuted, setIsMuted] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -213,20 +267,28 @@ const App: React.FC = () => {
         lastEventIdRef.current = eventId;
       }
       handleAlertLevel(mappedEvent.level);
+      const now = Date.now();
       setEvents((prev) => {
         for (let i = 0; i < prev.length; i += 1) {
           if (prev[i].id === mappedEvent.id) {
             return prev;
           }
         }
-        const next = [mappedEvent, ...prev];
-        next.sort(compareEventsByOccurrence);
-        const recent = filterEventsByAge(next, Date.now(), MAX_EVENT_AGE_MS);
+        const next = insertSorted(prev, mappedEvent, compareEventsByOccurrence);
+        const recent = filterEventsByAge(next, now, MAX_EVENT_AGE_MS);
         return limitEventsByCategory(recent, MAX_EVENTS_PER_CATEGORY);
+      });
+      const metric = toMetricFromEvent(mappedEvent);
+      setMetrics((prev) => {
+        for (let i = 0; i < prev.length; i += 1) {
+          if (prev[i].id === metric.id) {
+            return prev;
+          }
+        }
+        return insertSorted(prev, metric, compareMetricsByOccurrence);
       });
       setSourceStatuses((prev) => {
         const next = prev.slice();
-        const now = Date.now();
         for (let i = 0; i < next.length; i += 1) {
           if (next[i].sourceId === mappedEvent.sourceId) {
             next[i] = { ...next[i], isConnected: true, lastUpdate: now };
@@ -269,13 +331,21 @@ const App: React.FC = () => {
 
     const loadInitialEvents = async () => {
       try {
-        const since = new Date(Date.now() - MAX_EVENT_AGE_MS);
-        const allEventsPromise = fetchEvents({ since });
-        const kindPromises: Promise<ApiEvent[]>[] = [];
+        const eventsSince = new Date(Date.now() - MAX_EVENT_AGE_MS);
+        const metricsSince = new Date(Date.now() - METRICS_WINDOW_MS);
+        const allEventsPromise = fetchEvents({ since: eventsSince });
+        const eventKindPromises: Promise<ApiEvent[]>[] = [];
+        const metricKindPromises: Promise<ApiEventMetric[]>[] = [];
         for (let i = 0; i < EVENT_KIND_VALUES.length; i += 1) {
-          kindPromises.push(fetchEvents({ kind: EVENT_KIND_VALUES[i], limit: MAX_EVENTS_PER_CATEGORY, since }));
+          const kind = EVENT_KIND_VALUES[i];
+          eventKindPromises.push(fetchEvents({ kind, limit: MAX_EVENTS_PER_CATEGORY, since: eventsSince }));
+          metricKindPromises.push(fetchEventMetrics({ kind, limit: METRICS_FETCH_LIMIT, since: metricsSince }));
         }
-        const [allEvents, kindResults] = await Promise.all([allEventsPromise, Promise.allSettled(kindPromises)]);
+        const [allEvents, eventsKindResults, metricsKindResults] = await Promise.all([
+          allEventsPromise,
+          Promise.allSettled(eventKindPromises),
+          Promise.allSettled(metricKindPromises),
+        ]);
         if (!isActive) {
           return;
         }
@@ -283,8 +353,8 @@ const App: React.FC = () => {
         for (let i = 0; i < allEvents.length; i += 1) {
           combined.push(allEvents[i]);
         }
-        for (let i = 0; i < kindResults.length; i += 1) {
-          const result = kindResults[i];
+        for (let i = 0; i < eventsKindResults.length; i += 1) {
+          const result = eventsKindResults[i];
           if (result.status === 'fulfilled') {
             for (let j = 0; j < result.value.length; j += 1) {
               combined.push(result.value[j]);
@@ -305,6 +375,37 @@ const App: React.FC = () => {
         mapped.sort(compareEventsByOccurrence);
         const recent = filterEventsByAge(mapped, Date.now(), MAX_EVENT_AGE_MS);
         setEvents(limitEventsByCategory(recent, MAX_EVENTS_PER_CATEGORY));
+        const metricsSeed: EventMetric[] = [];
+        let hasMetricsResponse = false;
+        const missingMetricKinds: number[] = [];
+        for (let i = 0; i < metricsKindResults.length; i += 1) {
+          const result = metricsKindResults[i];
+          const kind = EVENT_KIND_VALUES[i];
+          if (result.status === 'fulfilled') {
+            hasMetricsResponse = true;
+            for (let j = 0; j < result.value.length; j += 1) {
+              metricsSeed.push(toEventMetric(result.value[j]));
+            }
+          } else {
+            missingMetricKinds.push(kind);
+            console.warn('Failed to fetch event metrics by kind', kind, result.reason);
+          }
+        }
+        if (!hasMetricsResponse) {
+          for (let i = 0; i < mapped.length; i += 1) {
+            metricsSeed.push(toMetricFromEvent(mapped[i]));
+          }
+        } else if (missingMetricKinds.length > 0) {
+          const missingKindSet = new Set(missingMetricKinds);
+          for (let i = 0; i < mapped.length; i += 1) {
+            const event = mapped[i];
+            if (missingKindSet.has(event.kind)) {
+              metricsSeed.push(toMetricFromEvent(event));
+            }
+          }
+        }
+        metricsSeed.sort(compareMetricsByOccurrence);
+        setMetrics(metricsSeed);
         if (mapped.length > 0) {
           lastEventIdRef.current = mapped[0].id;
         }
@@ -369,6 +470,19 @@ const App: React.FC = () => {
   }, []);
 
   const recentEvents = useMemo(() => filterEventsByAge(events, nowMs, MAX_EVENT_AGE_MS), [events, nowMs]);
+  const recentMetrics = useMemo(() => filterMetricsByAge(metrics, nowMs), [metrics, nowMs]);
+
+  const metricsByCategory = useMemo(() => {
+    const grouped: Record<string, EventMetric[]> = {};
+    for (let i = 0; i < recentMetrics.length; i += 1) {
+      const metric = recentMetrics[i];
+      if (!grouped[metric.category]) {
+        grouped[metric.category] = [];
+      }
+      grouped[metric.category].push(metric);
+    }
+    return grouped;
+  }, [recentMetrics]);
 
   const sidebarEvents = useMemo(() => {
     const priorityMap = {
@@ -427,7 +541,12 @@ const App: React.FC = () => {
 
         {/* Main Grid: Scrollable area */}
         <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col">
-          <CategoryGrid groups={categoryGroups} sortMode={categorySortMode} onSortModeChange={setCategorySortMode} />
+          <CategoryGrid
+            eventsByCategory={categoryGroups}
+            metricsByCategory={metricsByCategory}
+            sortMode={categorySortMode}
+            onSortModeChange={setCategorySortMode}
+          />
         </div>
 
         <DisasterMap

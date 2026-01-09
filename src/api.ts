@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { EVENT_KIND_LABELS, EVENT_SOURCE_LABELS, SOURCE_DISPLAY_ORDER, STATUS_SOURCE_LABELS } from './constants';
-import { type DisasterEvent, EventKinds, EventLevels, EventSources, type SourceStatus } from './types';
+import {
+  type DisasterEvent,
+  EventKinds,
+  EventLevels,
+  type EventMetric,
+  EventSources,
+  type SourceStatus,
+} from './types';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -23,6 +30,14 @@ const schemaEvent = z.object({
   level: z.enum(EventLevels),
 });
 
+const schemaEventMetric = z.object({
+  id: z.string(),
+  source: z.enum(EventSources),
+  kind: z.enum(EventKinds),
+  occurredAt: z.string().nullable(),
+  level: z.enum(EventLevels),
+});
+
 const schemaSourceStatus = z.object({
   sourceId: z.number().int(),
   sourceKey: z.string(),
@@ -40,6 +55,7 @@ const schemaSourcesResponse = z.object({
 });
 
 export type ApiEvent = z.infer<typeof schemaEvent>;
+export type ApiEventMetric = z.infer<typeof schemaEventMetric>;
 type EventsQueryOptions = {
   kind?: number;
   limit?: number;
@@ -150,6 +166,25 @@ export const fetchEvents = async (options?: EventsQueryOptions): Promise<ApiEven
   return payload;
 };
 
+export const fetchEventMetrics = async (options?: EventsQueryOptions): Promise<ApiEventMetric[]> => {
+  const { kind, limit = 10, since } = options ?? {};
+  const url = new URL(buildApiUrl('/api/events/metrics'));
+  if (kind != null) {
+    url.searchParams.set('kind', kind.toString());
+  }
+  url.searchParams.set('limit', limit.toString());
+  if (since) {
+    url.searchParams.set('since', since.toISOString());
+  }
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    const kindSuffix = kind != null ? ` (kind ${kind})` : '';
+    throw new Error(`Failed to fetch event metrics${kindSuffix}: ${response.status}`);
+  }
+  const payload = z.array(schemaEventMetric).parse(await response.json());
+  return payload;
+};
+
 export const parseEventData = (raw: string): ApiEvent | null => {
   let parsed: unknown;
   try {
@@ -185,6 +220,16 @@ export const toDisasterEvent = (event: ApiEvent, isRealtime = false): DisasterEv
     geo: event.geo ?? null,
     regionCodes: event.regionCodes ?? null,
     isRealtime,
+  };
+};
+
+export const toEventMetric = (metric: ApiEventMetric): EventMetric => {
+  const occurredAtMs = parseDateMs(metric.occurredAt);
+  return {
+    id: metric.id,
+    category: getKindLabel(metric.kind),
+    level: metric.level,
+    timestamp: occurredAtMs ?? Date.now(),
   };
 };
 

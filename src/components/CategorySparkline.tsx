@@ -1,8 +1,8 @@
 import type React from 'react';
-import { type DisasterEvent, EventLevels } from '../types';
+import { EventLevels, type EventMetric } from '../types';
 
 interface CategorySparklineProps {
-  events: DisasterEvent[];
+  metrics: EventMetric[];
   hours?: number;
 }
 
@@ -18,7 +18,7 @@ const LEVEL_BAR_COLOR: Record<EventLevels, string> = {
   [EventLevels.Critical]: 'text-red-400',
 };
 
-const CategorySparkline: React.FC<CategorySparklineProps> = ({ events, hours = 12 }) => {
+const CategorySparkline: React.FC<CategorySparklineProps> = ({ metrics, hours = 12 }) => {
   const bucketCount = Math.max(2, hours);
   const buckets = new Array<number>(bucketCount).fill(0);
   const bucketMaxLevels = new Array<EventLevels>(bucketCount).fill(EventLevels.Info);
@@ -27,17 +27,17 @@ const CategorySparkline: React.FC<CategorySparklineProps> = ({ events, hours = 1
   const currentHourStart = Math.floor(now / HOUR_MS) * HOUR_MS;
   const startTime = currentHourStart - (bucketCount - 1) * HOUR_MS;
 
-  for (const event of events) {
-    if (event.timestamp < startTime) {
+  for (const metric of metrics) {
+    if (metric.timestamp < startTime) {
       continue;
     }
-    const index = Math.floor((event.timestamp - startTime) / HOUR_MS);
+    const index = Math.floor((metric.timestamp - startTime) / HOUR_MS);
     if (index >= bucketCount) {
       continue;
     }
     buckets[index] += 1;
-    if (!bucketHasEvents[index] || event.level > bucketMaxLevels[index]) {
-      bucketMaxLevels[index] = event.level;
+    if (!bucketHasEvents[index] || metric.level > bucketMaxLevels[index]) {
+      bucketMaxLevels[index] = metric.level;
     }
     bucketHasEvents[index] = true;
   }

@@ -2,17 +2,23 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { LayoutGrid } from 'lucide-react';
 import type React from 'react';
 import { getEventKindIcon, LEVEL_CONFIG } from '../constants';
-import { type CategoryGroup, type CategorySortMode, EventLevels } from '../types';
+import { type CategoryGroup, type CategorySortMode, EventLevels, type EventMetric } from '../types';
 import CategoryEventCard from './CategoryEventCard';
 import CategorySparkline from './CategorySparkline';
 
 interface CategoryGridProps {
-  groups: CategoryGroup[];
+  eventsByCategory: CategoryGroup[];
+  metricsByCategory: Record<string, EventMetric[]>;
   sortMode: CategorySortMode;
   onSortModeChange: (mode: CategorySortMode) => void;
 }
 
-const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortModeChange }) => {
+const CategoryGrid: React.FC<CategoryGridProps> = ({
+  eventsByCategory,
+  metricsByCategory,
+  sortMode,
+  onSortModeChange,
+}) => {
   const levels = [EventLevels.Info, EventLevels.Minor, EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
   const isLatest = sortMode === 'latest';
   const isScore = sortMode === 'score';
@@ -63,7 +69,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortMod
       {/* Responsive Grid Container: 1 col on mobile, 2 on tablet, 3 on desktop */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 lg:overflow-hidden pb-4 md:pb-0">
         <AnimatePresence mode="popLayout">
-          {groups.map((group) => {
+          {eventsByCategory.map((group) => {
             let highestLevel = group.latestEvent.level;
             for (const event of group.events) {
               if (event.level > highestLevel) {
@@ -91,7 +97,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ groups, sortMode, onSortMod
                     </h3>
                   </div>
                   <div className="flex items-center gap-2 min-w-0">
-                    <CategorySparkline events={group.events} hours={24} />
+                    <CategorySparkline metrics={metricsByCategory[group.category] ?? []} hours={24} />
                     <span className="text-sm md:text-base leading-none" aria-hidden="true">
                       {getEventKindIcon(group.latestEvent.kind)}
                     </span>
