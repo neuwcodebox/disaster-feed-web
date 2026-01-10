@@ -48,18 +48,65 @@ const CategorySparkline: React.FC<CategorySparklineProps> = ({ metrics, hours = 
       maxScore = buckets[i];
     }
   }
-  if (maxScore === 0) {
-    maxScore = 1;
-  }
+  const displayMaxScore = maxScore;
+  const normalizedMaxScore = maxScore === 0 ? 1 : maxScore;
 
   const width = 72;
   const height = 18;
   const gap = bucketCount > 18 ? 0.5 : 1;
   const barWidth = (width - gap * (bucketCount - 1)) / bucketCount;
+  const guideLines: React.ReactElement[] = [];
+  if (displayMaxScore > 0) {
+    const GUIDE_STEP = 10;
+    const GUIDE_STEP_LARGE = 50;
+    const MAX_GUIDE_COUNT = 4;
+    const guideCount = Math.floor((displayMaxScore - 1) / GUIDE_STEP);
+    const useLargeStep = guideCount > MAX_GUIDE_COUNT;
+    const ticks10: number[] = [];
+    const ticks50: number[] = [];
+    const showFineGuides = displayMaxScore <= 100;
+
+    if (showFineGuides) {
+      for (let tick = GUIDE_STEP; tick < displayMaxScore; tick += GUIDE_STEP) {
+        ticks10.push(tick);
+      }
+    }
+
+    if (useLargeStep) {
+      for (let tick = GUIDE_STEP_LARGE; tick < displayMaxScore; tick += GUIDE_STEP_LARGE) {
+        ticks50.push(tick);
+      }
+    }
+
+    const renderGuideLine = (tickValue: number, className: string, strokeWidth: number) => {
+      const y = height - (tickValue / normalizedMaxScore) * height;
+
+      guideLines.push(
+        <line
+          key={`guide-line-${tickValue}`}
+          x1={0}
+          y1={y}
+          x2={width}
+          y2={y}
+          stroke="currentColor"
+          className={className}
+          strokeWidth={strokeWidth}
+        />,
+      );
+    };
+
+    for (let i = 0; i < ticks10.length; i += 1) {
+      renderGuideLine(ticks10[i], 'text-slate-700/50', 0.6);
+    }
+
+    for (let i = 0; i < ticks50.length; i += 1) {
+      renderGuideLine(ticks50[i], 'text-slate-600/80', 0.8);
+    }
+  }
   const bars: React.ReactElement[] = [];
   for (let i = 0; i < buckets.length; i += 1) {
     const score = buckets[i];
-    const normalized = (score / maxScore) * height;
+    const normalized = (score / normalizedMaxScore) * height;
     const barHeight = Math.max(MIN_BAR_HEIGHT, normalized);
     const capHeight = Math.min(CAP_HEIGHT, barHeight);
     const x = i * (barWidth + gap);
@@ -102,13 +149,14 @@ const CategorySparkline: React.FC<CategorySparklineProps> = ({ metrics, hours = 
   }
 
   return (
-    <div className="flex items-center">
+    <div className="relative w-full h-4 md:h-5">
       <svg
-        className="h-4 w-full md:h-5"
+        className="h-full w-full"
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={`최근 ${bucketCount}시간 이벤트 점수 막대 추이`}
       >
+        {guideLines}
         {bars}
       </svg>
     </div>
