@@ -66,10 +66,12 @@ const CategorySparkline: React.FC<CategorySparklineProps> = ({ metrics, hours = 
     const y = height - barHeight;
     const level = bucketMaxLevels[i];
     const isEmpty = !bucketHasEvents[i];
+    const isCurrentBar = i === bucketCount - 1;
     const bucketTime = startTime + i * HOUR_MS;
     const colorClass = LEVEL_BAR_COLOR[level];
     const baseOpacity = isEmpty ? 'opacity-25' : 'opacity-65';
     const capOpacity = isEmpty ? 'opacity-45' : 'opacity-90';
+    const pulseOpacity = isEmpty ? 'opacity-45' : 'opacity-90';
 
     bars.push(
       <g key={`bar-${bucketTime}`}>
@@ -89,8 +91,12 @@ const CategorySparkline: React.FC<CategorySparklineProps> = ({ metrics, hours = 
           height={capHeight}
           rx={barWidth > 2 ? 1 : 0.5}
           fill="currentColor"
-          className={`${colorClass} ${capOpacity}`}
-        />
+          className={`${colorClass} ${isCurrentBar ? pulseOpacity : capOpacity}`}
+        >
+          {isCurrentBar ? (
+            <animate attributeName="opacity" values="0.35;0.95;0.35" dur="1.8s" repeatCount="indefinite" />
+          ) : null}
+        </rect>
       </g>,
     );
   }
