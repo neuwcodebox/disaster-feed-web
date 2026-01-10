@@ -9,11 +9,12 @@ const LEVEL_BASE_SCORES: Record<EventLevels, number> = {
   [EventLevels.Critical]: 160,
 };
 const SCORE_DECAY_PER_MINUTE = 1;
+const SCORE_DECAY_PER_MS = SCORE_DECAY_PER_MINUTE / 60000;
 
-const getEventScore = (event: DisasterEvent, nowMs: number): number => {
+const getEventScoreWeight = (event: DisasterEvent): number => {
   const baseScore = LEVEL_BASE_SCORES[event.level] ?? 0;
-  const elapsedMinutes = Math.max(0, (nowMs - event.timestamp) / 60000);
-  return baseScore - elapsedMinutes * SCORE_DECAY_PER_MINUTE;
+  // 점수 감쇠율이 동일하므로 정렬용 가중치는 고정 값으로 계산합니다.
+  return baseScore + event.timestamp * SCORE_DECAY_PER_MS;
 };
 
 export const compareEventsByOccurrence = (a: DisasterEvent, b: DisasterEvent): number => {
@@ -30,15 +31,13 @@ export const compareMetricsByOccurrence = (a: EventMetric, b: EventMetric): numb
   return b.id.localeCompare(a.id);
 };
 
-export const compareEventsByScore =
-  (nowMs: number) =>
-  (a: DisasterEvent, b: DisasterEvent): number => {
-    const scoreDiff = getEventScore(b, nowMs) - getEventScore(a, nowMs);
-    if (scoreDiff !== 0) {
-      return scoreDiff;
-    }
-    return compareEventsByOccurrence(a, b);
-  };
+export const compareEventsByScoreStatic = (a: DisasterEvent, b: DisasterEvent): number => {
+  const scoreDiff = getEventScoreWeight(b) - getEventScoreWeight(a);
+  if (scoreDiff !== 0) {
+    return scoreDiff;
+  }
+  return compareEventsByOccurrence(a, b);
+};
 
 export const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): DisasterEvent[] => {
   const counts = new Map<string, number>();

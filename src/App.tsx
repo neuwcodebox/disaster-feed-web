@@ -13,15 +13,92 @@ import {
   MAX_EVENTS_PER_CATEGORY,
   METRICS_FETCH_LIMIT,
   METRICS_WINDOW_MS,
-  SCORE_RESORT_INTERVAL_MS,
   SIDEBAR_EVENT_LIMIT,
 } from './config/appRuntime';
 import { MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL } from './constants';
 import { useAlertSound } from './hooks/useAlertSound';
 import { useDisasterStream } from './hooks/useDisasterStream';
+import { useExpiryClock } from './hooks/useExpiryClock';
 import type { CategoryGroup, CategorySortMode, DisasterEvent, EventMetric } from './types';
 import { filterEventsByAge, filterMetricsByAge } from './utils/eventFilters';
-import { compareEventsByOccurrence, compareEventsByScore } from './utils/eventProcessing';
+import { compareEventsByOccurrence, compareEventsByScoreStatic } from './utils/eventProcessing';
+
+const takeFirst = <T,>(items: T[], limit: number): T[] => {
+  if (items.length <= limit) {
+    return items;
+  }
+  return items.slice(0, limit);
+};
+
+const buildMetricsByCategory = (items: EventMetric[]): Record<string, EventMetric[]> => {
+  const grouped: Record<string, EventMetric[]> = {};
+  for (let i = 0; i < items.length; i += 1) {
+    const metric = items[i];
+    const existing = grouped[metric.category];
+    if (existing) {
+      existing.push(metric);
+    } else {
+      grouped[metric.category] = [metric];
+    }
+  }
+  return grouped;
+};
+
+const buildSidebarEvents = (items: DisasterEvent[], minLevel: number, limit: number): DisasterEvent[] => {
+  const filtered: DisasterEvent[] = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const event = items[i];
+    if (event.level >= minLevel) {
+      filtered.push(event);
+    }
+  }
+  if (filtered.length <= 1) {
+    return filtered;
+  }
+  filtered.sort(compareEventsByScoreStatic);
+  if (filtered.length > limit) {
+    filtered.length = limit;
+  }
+  return filtered;
+};
+
+const buildCategoryGroups = (
+  items: DisasterEvent[],
+  sortMode: CategorySortMode,
+  maxCategories: number,
+): CategoryGroup[] => {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const grouped = new Map<string, DisasterEvent[]>();
+  for (let i = 0; i < items.length; i += 1) {
+    const event = items[i];
+    const existing = grouped.get(event.category);
+    if (existing) {
+      existing.push(event);
+    } else {
+      grouped.set(event.category, [event]);
+    }
+  }
+
+  const eventSorter = sortMode === 'score' ? compareEventsByScoreStatic : compareEventsByOccurrence;
+  const sortedGroups: CategoryGroup[] = [];
+  for (const [category, groupEvents] of grouped) {
+    groupEvents.sort(eventSorter);
+    sortedGroups.push({
+      category,
+      latestEvent: groupEvents[0],
+      events: groupEvents,
+    });
+  }
+
+  sortedGroups.sort((a, b) => eventSorter(a.latestEvent, b.latestEvent));
+  if (sortedGroups.length > maxCategories) {
+    sortedGroups.length = maxCategories;
+  }
+  return sortedGroups;
+};
 
 const App: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
@@ -32,7 +109,6 @@ const App: React.FC = () => {
     }
     return window.matchMedia(MAP_LARGE_SCREEN_QUERY).matches;
   });
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const [categorySortMode, setCategorySortMode] = useState<CategorySortMode>('score');
 
   const { handleAlertLevel } = useAlertSound({ isMuted });
@@ -42,6 +118,12 @@ const App: React.FC = () => {
     metricsFetchLimit: METRICS_FETCH_LIMIT,
     maxEventsPerCategory: MAX_EVENTS_PER_CATEGORY,
     onAlertLevel: handleAlertLevel,
+  });
+  const nowMs = useExpiryClock({
+    events,
+    metrics,
+    maxEventAgeMs: MAX_EVENT_AGE_MS,
+    metricsWindowMs: METRICS_WINDOW_MS,
   });
 
   useEffect(() => {
@@ -59,15 +141,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, SCORE_RESORT_INTERVAL_MS);
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
-
   const toggleMap = useCallback(() => {
     setIsMapOpen((prev) => !prev);
   }, []);
@@ -79,54 +152,16 @@ const App: React.FC = () => {
   const recentEvents = useMemo(() => filterEventsByAge(events, nowMs, MAX_EVENT_AGE_MS), [events, nowMs]);
   const recentMetrics = useMemo(() => filterMetricsByAge(metrics, nowMs, METRICS_WINDOW_MS), [metrics, nowMs]);
 
-  const metricsByCategory = useMemo(() => {
-    const grouped: Record<string, EventMetric[]> = {};
-    for (let i = 0; i < recentMetrics.length; i += 1) {
-      const metric = recentMetrics[i];
-      if (!grouped[metric.category]) {
-        grouped[metric.category] = [];
-      }
-      grouped[metric.category].push(metric);
-    }
-    return grouped;
-  }, [recentMetrics]);
-
-  const sidebarEvents = useMemo(() => {
-    const filtered = recentEvents.filter((event) => event.level >= SIDEBAR_MIN_LEVEL);
-    if (filtered.length <= 1) {
-      return filtered;
-    }
-    const next = filtered.slice();
-    next.sort(compareEventsByScore(nowMs));
-    return next.slice(0, SIDEBAR_EVENT_LIMIT);
-  }, [nowMs, recentEvents]);
-
-  const categoryGroups = useMemo(() => {
-    const groups: Record<string, DisasterEvent[]> = {};
-    for (let i = 0; i < recentEvents.length; i += 1) {
-      const event = recentEvents[i];
-      if (!groups[event.category]) {
-        groups[event.category] = [];
-      }
-      groups[event.category].push(event);
-    }
-
-    const sortedGroups: CategoryGroup[] = [];
-    const groupKeys = Object.keys(groups);
-    const eventSorter = categorySortMode === 'score' ? compareEventsByScore(nowMs) : compareEventsByOccurrence;
-    for (let i = 0; i < groupKeys.length; i += 1) {
-      const category = groupKeys[i];
-      const groupEvents = groups[category];
-      groupEvents.sort(eventSorter);
-      sortedGroups.push({
-        category,
-        latestEvent: groupEvents[0],
-        events: groupEvents,
-      });
-    }
-
-    return sortedGroups.sort((a, b) => eventSorter(a.latestEvent, b.latestEvent)).slice(0, MAX_CATEGORIES_DISPLAY);
-  }, [categorySortMode, nowMs, recentEvents]);
+  const metricsByCategory = useMemo(() => buildMetricsByCategory(recentMetrics), [recentMetrics]);
+  const sidebarEvents = useMemo(
+    () => buildSidebarEvents(recentEvents, SIDEBAR_MIN_LEVEL, SIDEBAR_EVENT_LIMIT),
+    [recentEvents],
+  );
+  const categoryGroups = useMemo(
+    () => buildCategoryGroups(recentEvents, categorySortMode, MAX_CATEGORIES_DISPLAY),
+    [categorySortMode, recentEvents],
+  );
+  const footerEvents = useMemo(() => takeFirst(recentEvents, 10), [recentEvents]);
 
   const isMapVisible = isLargeScreen || isMapOpen;
 
@@ -171,7 +206,7 @@ const App: React.FC = () => {
 
       <UpdateNotifier />
 
-      <FooterMarquee events={recentEvents.slice(0, 10)} />
+      <FooterMarquee events={footerEvents} />
     </div>
   );
 };
