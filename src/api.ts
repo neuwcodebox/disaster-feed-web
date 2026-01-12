@@ -54,6 +54,10 @@ const schemaSourcesResponse = z.object({
   sources: z.array(schemaSourceStatus),
 });
 
+const schemaStreamClientsResponse = z.object({
+  total: z.number().int().nonnegative(),
+});
+
 export type ApiEvent = z.infer<typeof schemaEvent>;
 export type ApiEventMetric = z.infer<typeof schemaEventMetric>;
 type EventsQueryOptions = {
@@ -145,6 +149,15 @@ export const fetchSourceStatuses = async (): Promise<SourceStatus[]> => {
     return orderA - orderB;
   });
   return mapped;
+};
+
+export const fetchStreamClientsTotal = async (): Promise<number> => {
+  const response = await fetch(buildApiUrl('/api/events/stream/clients'));
+  if (!response.ok) {
+    throw new Error(`Failed to fetch stream clients: ${response.status}`);
+  }
+  const payload = schemaStreamClientsResponse.parse(await response.json());
+  return payload.total;
 };
 
 export const fetchEvents = async (options?: EventsQueryOptions): Promise<ApiEvent[]> => {

@@ -1,8 +1,9 @@
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Activity, Clock, Volume2, VolumeOff } from 'lucide-react';
+import { Activity, Clock, Users, Volume2, VolumeOff } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useState } from 'react';
+import { fetchStreamClientsTotal } from '../api';
 import type { SourceStatus } from '../types';
 
 interface HeaderProps {
@@ -13,10 +14,39 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }) => {
   const [now, setNow] = useState(new Date());
+  const [streamClientTotal, setStreamClientTotal] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadStreamClients = async () => {
+      try {
+        const total = await fetchStreamClientsTotal();
+        if (isActive) {
+          setStreamClientTotal(total);
+        }
+      } catch (error: unknown) {
+        console.warn('Failed to fetch stream clients', error);
+        if (isActive) {
+          setStreamClientTotal(null);
+        }
+      }
+    };
+
+    void loadStreamClients();
+    const timer = setInterval(() => {
+      void loadStreamClients();
+    }, 10000);
+
+    return () => {
+      isActive = false;
+      clearInterval(timer);
+    };
   }, []);
 
   return (
@@ -26,8 +56,15 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
           <Activity className="w-5 h-5 md:w-8 md:h-8 text-white" />
         </div>
         <div className="flex flex-col">
-          <h1 className="text-lg md:text-3xl font-extrabold tracking-tighter text-white whitespace-nowrap">
+          <h1 className="flex items-baseline gap-2 text-lg md:text-3xl font-extrabold tracking-tighter text-white whitespace-nowrap">
             <span className="text-red-500">실시간</span> 재난 통합 상황판
+            <span
+              className="inline-flex items-center ms-2 gap-0.5 md:gap-1 text-[10px] md:text-xs font-semibold text-slate-400"
+              title="현재 시청자 수"
+            >
+              <Users className="w-3 h-3 md:w-3.5 md:h-3.5" aria-hidden />
+              <span>{streamClientTotal ?? '-'}</span>
+            </span>
           </h1>
           <p className="hidden md:block text-[10px] text-slate-400 font-medium uppercase tracking-widest">
             Disaster Integrated Live Dashboard
