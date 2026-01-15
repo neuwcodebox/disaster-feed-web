@@ -152,7 +152,7 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.NcscCyberCrisis]: '국정원\n(사이버)',
   [EventSources.NctcTerrorAlert]: '국조실\n(테러)',
   [EventSources.KpxPowerSupply]: '산업부\n(전력)',
-  [EventSources.YnaNews]: '연합뉴스',
+  [EventSources.YnaNews]: '연합\n뉴스',
 };
 
 export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
