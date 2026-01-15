@@ -66,6 +66,7 @@ export enum EventSources {
   ForestFireWarning = 15,
   LandslideForecast = 16,
   MoisPressRelease = 17,
+  MsitPressRelease = 18,
 }
 
 export type EventGeo = {
