@@ -136,6 +136,7 @@ export const EVENT_KIND_VALUES: EventKinds[] = Object.values(EventKinds).filter(
 
 export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.SafekoreaSms]: '행안부\n(문자)',
+  [EventSources.MoisPressRelease]: '행안부\n(보도)',
   [EventSources.KmaMicroEarthquake]: '기상청\n(미소)',
   [EventSources.KmaPewsEarthquake]: '기상청\n(지진)',
   [EventSources.NfdsFireDispatch]: '소방청\n(화재)',
@@ -155,6 +156,7 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
 
 export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.SafekoreaSms]: '행안부',
+  [EventSources.MoisPressRelease]: '행안부',
   [EventSources.KmaMicroEarthquake]: '기상청',
   [EventSources.KmaPewsEarthquake]: '기상청',
   [EventSources.NfdsFireDispatch]: '소방청',
@@ -174,6 +176,7 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
 
 export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.SafekoreaSms,
+  EventSources.MoisPressRelease,
   EventSources.KmaMicroEarthquake,
   EventSources.KmaPewsEarthquake,
   EventSources.KmaWeatherWarning,
