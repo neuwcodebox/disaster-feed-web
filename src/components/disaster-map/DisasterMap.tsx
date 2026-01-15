@@ -6,7 +6,7 @@ import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { DisasterEvent, EventLevels } from '../../types';
+import { type DisasterEvent, EventLevels } from '../../types';
 import { filterEventsByAge } from '../../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
 import DisasterMapEmojiMarkers, {
@@ -77,6 +77,24 @@ const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
 };
 const WINDOW_STEP_MS = 15 * 60 * 1000;
 const WINDOW_REFRESH_INTERVAL_MS = 60000;
+const NATIONWIDE_REQUIRED_CODES = new Set<string>([
+  '1100000000',
+  '2600000000',
+  '2700000000',
+  '2800000000',
+  '2900000000',
+  '3000000000',
+  '3100000000',
+  '3611000000',
+  '4100000000',
+  '4300000000',
+  '4400000000',
+  '4600000000',
+  '4700000000',
+  '4800000000',
+  '5100000000',
+  '5200000000',
+]);
 
 const formatWindowLabel = (durationMs: number): string => {
   const totalMinutes = Math.max(1, Math.round(durationMs / 60000));
@@ -97,6 +115,38 @@ const formatWindowLabel = (durationMs: number): string => {
     return `${totalDays}일`;
   }
   return `${totalDays}일 ${remainingHours}시간`;
+};
+
+const isNationwideRegionCodes = (regionCodes: string[] | null): boolean => {
+  if (!regionCodes || regionCodes.length === 0) {
+    return false;
+  }
+  const normalizedCodes = new Set<string>();
+  for (let i = 0; i < regionCodes.length; i += 1) {
+    const normalized = normalizeRegionCode(regionCodes[i]);
+    if (normalized) {
+      normalizedCodes.add(normalized);
+    }
+  }
+  if (normalizedCodes.size === 0) {
+    return false;
+  }
+  for (const requiredCode of NATIONWIDE_REQUIRED_CODES) {
+    if (!normalizedCodes.has(requiredCode)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const isNationwideLowLevelEvent = (event: DisasterEvent): boolean => {
+  if (event.level > EventLevels.Minor) {
+    return false;
+  }
+  if (event.geo) {
+    return false;
+  }
+  return isNationwideRegionCodes(event.regionCodes);
 };
 
 const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
@@ -227,8 +277,19 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     () => filterEventsByAge(events, windowNowMs, windowAgeMs),
     [events, windowAgeMs, windowNowMs],
   );
-  const regionLevels = useMemo(() => collectRegionLevels(visibleEvents), [visibleEvents]);
-  const eventPoints = useMemo(() => collectEventPoints(visibleEvents), [visibleEvents]);
+  const mapEvents = useMemo(() => {
+    const nextMapEvents: DisasterEvent[] = [];
+    for (let i = 0; i < visibleEvents.length; i += 1) {
+      const event = visibleEvents[i];
+      if (isNationwideLowLevelEvent(event)) {
+        continue;
+      }
+      nextMapEvents.push(event);
+    }
+    return nextMapEvents;
+  }, [visibleEvents]);
+  const regionLevels = useMemo(() => collectRegionLevels(mapEvents), [mapEvents]);
+  const eventPoints = useMemo(() => collectEventPoints(mapEvents), [mapEvents]);
   const regionIndex = useMemo<GeoRegionIndex | null>(() => {
     if (!regionData) {
       return null;
@@ -252,10 +313,10 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   }, [regionData]);
   const regionCentroids = useMemo(() => buildRegionCentroids(regionIndex), [regionIndex]);
   const regionEmojiLabels = useMemo(
-    () => buildRegionEmojiLabels(visibleEvents, regionCentroids),
-    [regionCentroids, visibleEvents],
+    () => buildRegionEmojiLabels(mapEvents, regionCentroids),
+    [mapEvents, regionCentroids],
   );
-  const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(visibleEvents), [visibleEvents]);
+  const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(mapEvents), [mapEvents]);
   const { selectedMarker: selectedEmojiMarker, selectedLabel: selectedEmojiLabel } = useEmojiMarkerSelection({
     map: mapInstance,
     pointMarkers: pointEmojiMarkers,
@@ -331,6 +392,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         continue;
       }
       if (event.timestamp < threshold) {
+        continue;
+      }
+      if (isNationwideLowLevelEvent(event)) {
         continue;
       }
       if (event.geo) {
