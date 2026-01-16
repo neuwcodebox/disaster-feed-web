@@ -87,15 +87,14 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
   return (
     <div className="flex-1 bg-slate-950 p-4 md:p-6 flex flex-col lg:overflow-hidden">
       {/* Grid Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3 shrink-0">
-        <div className="flex items-center space-x-2">
-          <LayoutGrid className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
-          <h2 className="text-lg md:text-xl font-bold text-slate-300">유형별 현황</h2>
-        </div>
+      <div className="flex flex-row flex-wrap items-start gap-3 md:items-center justify-between mb-4 shrink-0">
+        <div className="flex flex-row flex-wrap items-center justify-between gap-2 min-w-0 md:gap-3">
+          <div className="flex items-center space-x-2 shrink-0">
+            <LayoutGrid className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
+            <h2 className="text-lg md:text-xl font-bold text-slate-300">유형별 현황</h2>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 justify-between">
-          {/* Legend Section - Wrap on very small screens */}
-          <div className="flex min-w-0 shrink items-center space-x-2 md:space-x-3 bg-slate-900/30 px-2 md:px-3 py-1.5 rounded-lg border border-slate-800/50 overflow-x-auto">
+          <div className="inline-flex w-fit min-w-0 flex-wrap items-center gap-2 bg-slate-900/30 px-2 md:px-3 py-1.5 rounded-lg border border-slate-800/50 self-start">
             {levels.map((level) => (
               <div key={level} className="flex items-center space-x-1 whitespace-nowrap">
                 <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${LEVEL_CONFIG[level].bg}`} />
@@ -103,53 +102,53 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
               </div>
             ))}
           </div>
+        </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center text-[9px] md:text-[10px] font-bold uppercase tracking-widest bg-slate-900/50 px-0.5 py-0.5 md:px-1 md:py-1 rounded-full border border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 shrink-0">
+          <div className="flex items-center text-[9px] md:text-[10px] font-bold uppercase tracking-widest bg-slate-900/50 px-0.5 py-0.5 md:px-1 md:py-1 rounded-full border border-slate-800">
+            <button
+              type="button"
+              onClick={() => onSortModeChange('latest')}
+              className={`px-2 py-0.5 rounded-full transition ${
+                isLatest ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-200'
+              }`}
+            >
+              최신순
+            </button>
+            <button
+              type="button"
+              onClick={() => onSortModeChange('score')}
+              className={`px-2 py-0.5 rounded-full transition ${
+                isScore ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-200'
+              }`}
+            >
+              우선순
+            </button>
+          </div>
+
+          {hasMultiplePages ? (
+            <div className="flex items-center gap-0.5 bg-slate-900/50 px-0.5 py-0.5 md:px-1 md:py-1 rounded-full border border-slate-800 text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400">
               <button
                 type="button"
-                onClick={() => onSortModeChange('latest')}
-                className={`px-2 py-0.5 rounded-full transition ${
-                  isLatest ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-200'
-                }`}
+                onClick={goPrev}
+                disabled={pageIndex === 0}
+                aria-label="이전 페이지"
+                className="rounded-full p-1 transition text-slate-400 hover:text-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
               >
-                최신순
+                <ChevronLeft className="w-3 h-3" />
               </button>
+              <span className="min-w-5 text-center text-slate-200">{pageLabel}</span>
               <button
                 type="button"
-                onClick={() => onSortModeChange('score')}
-                className={`px-2 py-0.5 rounded-full transition ${
-                  isScore ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-200'
-                }`}
+                onClick={goNext}
+                disabled={pageIndex >= totalPages - 1}
+                aria-label="다음 페이지"
+                className="rounded-full p-1 transition text-slate-400 hover:text-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
               >
-                우선순
+                <ChevronRight className="w-3 h-3" />
               </button>
             </div>
-
-            {hasMultiplePages ? (
-              <div className="flex items-center gap-0.5 bg-slate-900/50 px-0.5 py-0.5 md:px-1 md:py-1 rounded-full border border-slate-800 text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                <button
-                  type="button"
-                  onClick={goPrev}
-                  disabled={pageIndex === 0}
-                  aria-label="이전 페이지"
-                  className="rounded-full p-1 transition text-slate-400 hover:text-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-3 h-3" />
-                </button>
-                <span className="min-w-5 text-center text-slate-200">{pageLabel}</span>
-                <button
-                  type="button"
-                  onClick={goNext}
-                  disabled={pageIndex >= totalPages - 1}
-                  aria-label="다음 페이지"
-                  className="rounded-full p-1 transition text-slate-400 hover:text-slate-100 disabled:text-slate-600 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
-            ) : null}
-          </div>
+          ) : null}
         </div>
       </div>
 
