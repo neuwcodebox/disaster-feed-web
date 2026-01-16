@@ -15,7 +15,7 @@ import {
   METRICS_WINDOW_MS,
   SIDEBAR_EVENT_LIMIT,
 } from './config/appRuntime';
-import { MAX_CATEGORIES_DISPLAY, SIDEBAR_MIN_LEVEL } from './constants';
+import { SIDEBAR_MIN_LEVEL } from './constants';
 import { useAlertSound } from './hooks/useAlertSound';
 import { useDisasterStream } from './hooks/useDisasterStream';
 import { useExpiryClock } from './hooks/useExpiryClock';
@@ -62,11 +62,7 @@ const buildSidebarEvents = (items: DisasterEvent[], minLevel: number, limit: num
   return filtered;
 };
 
-const buildCategoryGroups = (
-  items: DisasterEvent[],
-  sortMode: CategorySortMode,
-  maxCategories: number,
-): CategoryGroup[] => {
+const buildCategoryGroups = (items: DisasterEvent[], sortMode: CategorySortMode): CategoryGroup[] => {
   if (items.length === 0) {
     return [];
   }
@@ -94,9 +90,6 @@ const buildCategoryGroups = (
   }
 
   sortedGroups.sort((a, b) => eventSorter(a.latestEvent, b.latestEvent));
-  if (sortedGroups.length > maxCategories) {
-    sortedGroups.length = maxCategories;
-  }
   return sortedGroups;
 };
 
@@ -158,7 +151,7 @@ const App: React.FC = () => {
     [recentEvents],
   );
   const categoryGroups = useMemo(
-    () => buildCategoryGroups(recentEvents, categorySortMode, MAX_CATEGORIES_DISPLAY),
+    () => buildCategoryGroups(recentEvents, categorySortMode),
     [categorySortMode, recentEvents],
   );
   const footerEvents = useMemo(() => takeFirst(recentEvents, 10), [recentEvents]);

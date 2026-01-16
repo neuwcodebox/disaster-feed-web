@@ -197,5 +197,5 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.YnaNews,
 ];
 
-export const MAX_CATEGORIES_DISPLAY = 6;
+export const CATEGORY_PAGE_SIZE = 6;
 export const SIDEBAR_MIN_LEVEL = EventLevels.Moderate;
