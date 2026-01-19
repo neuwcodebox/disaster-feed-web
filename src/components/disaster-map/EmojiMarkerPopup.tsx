@@ -3,6 +3,7 @@ import { ko } from 'date-fns/locale';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { getEventKindIcon } from '../../constants';
+import EventSourceLink from '../EventSourceLink';
 import type { EmojiLabel, EmojiMarker } from './DisasterMapTypes';
 
 type EmojiMarkerPopupProps = {
@@ -111,7 +112,7 @@ const EmojiMarkerPopup: React.FC<EmojiMarkerPopupProps> = ({
     <div className="pointer-events-none absolute inset-0 z-20">
       <div
         ref={setPopupElement}
-        className="min-w-55 max-w-[320px] rounded-xl border border-slate-800/80 bg-slate-950/90 p-3 text-slate-100 shadow-[0_12px_30px_rgba(2,6,23,0.55)] backdrop-blur"
+        className="pointer-events-auto min-w-55 max-w-[320px] rounded-xl border border-slate-800/80 bg-slate-950/90 p-3 text-slate-100 shadow-[0_12px_30px_rgba(2,6,23,0.55)] backdrop-blur"
         style={{
           position: 'absolute',
           left: position ? position.left : marker.x,
@@ -135,7 +136,12 @@ const EmojiMarkerPopup: React.FC<EmojiMarkerPopupProps> = ({
                   <div className="mt-0.5 truncate text-[10px] font-medium text-slate-400">{event.content}</div>
                 )}
                 <div className="text-[10px] font-medium text-slate-400">
-                  {formatRelativeTime(event.timestamp)} · {event.source}
+                  {formatRelativeTime(event.timestamp)} ·{' '}
+                  <EventSourceLink
+                    sourceId={event.sourceId}
+                    label={event.source}
+                    className="text-slate-400 hover:text-slate-200 transition"
+                  />
                 </div>
               </div>
             </div>

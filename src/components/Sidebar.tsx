@@ -5,6 +5,7 @@ import { ShieldAlert } from 'lucide-react';
 import type React from 'react';
 import { getEventKindIcon, LEVEL_CONFIG } from '../constants';
 import { type DisasterEvent, EventLevels } from '../types';
+import EventSourceLink from './EventSourceLink';
 
 interface SidebarProps {
   events: DisasterEvent[];
@@ -90,7 +91,14 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
 
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[8px] md:text-[10px] font-semibold text-slate-400">
-                      {event.source} · {event.category}
+                      <EventSourceLink
+                        sourceId={event.sourceId}
+                        label={event.source}
+                        className="text-slate-400 hover:text-slate-200 transition"
+                        decorationClassName="decoration-slate-400/50 hover:decoration-slate-300/70"
+                      />
+                      {' · '}
+                      {event.category}
                     </span>
                   </div>
 

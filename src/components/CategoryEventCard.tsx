@@ -5,6 +5,7 @@ import type React from 'react';
 import { useState } from 'react';
 import { LEVEL_CONFIG } from '../constants';
 import type { DisasterEvent } from '../types';
+import EventSourceLink from './EventSourceLink';
 
 interface CategoryEventCardProps {
   event: DisasterEvent;
@@ -77,7 +78,11 @@ const CategoryEventCard = ({ event, isPrimary }: CategoryEventCardProps) => {
             <div className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold">
               <span className="text-slate-500">{formatRelativeTime(event.timestamp)}</span>
               <span className="text-slate-500">·</span>
-              <span className="text-slate-500">{event.source}</span>
+              <EventSourceLink
+                sourceId={event.sourceId}
+                label={event.source}
+                className="text-slate-500 hover:text-slate-300 transition"
+              />
             </div>
           </div>
           <h4 className="text-xs md:text-[13px] font-bold leading-tight whitespace-pre-line break-all text-slate-100">

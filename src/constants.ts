@@ -84,6 +84,7 @@ export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.CrowdDensity]: '인파밀집',
   [EventKinds.WildAnimal]: '야생동물',
   [EventKinds.Cyber]: '사이버',
+  [EventKinds.SpaceWeather]: '우주환경',
 };
 
 export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
@@ -126,6 +127,7 @@ export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
   [EventKinds.CrowdDensity]: '👥',
   [EventKinds.WildAnimal]: '🐗',
   [EventKinds.Cyber]: '🌐',
+  [EventKinds.SpaceWeather]: '🛰️',
 };
 
 export const getEventKindIcon = (kind: number): string => EVENT_KIND_ICONS[kind as EventKinds] ?? '?';
@@ -153,6 +155,7 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.NctcTerrorAlert]: '국조실\n(테러)',
   [EventSources.KpxPowerSupply]: '산업부\n(전력)',
   [EventSources.YnaNews]: '연합\n뉴스',
+  [EventSources.KasaSpaceWeatherWarning]: '우주청\n(환경)',
 };
 
 export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
@@ -174,7 +177,34 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.NctcTerrorAlert]: '국조실',
   [EventSources.KpxPowerSupply]: '산업부',
   [EventSources.YnaNews]: '연합뉴스',
+  [EventSources.KasaSpaceWeatherWarning]: '우주청',
 };
+
+export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
+  [EventSources.SafekoreaSms]: 'https://www.safekorea.go.kr/idsiSFK/neo/sfk/cs/sfc/dis/disasterMsgList.jsp?menuSeq=679',
+  [EventSources.MoisPressRelease]:
+    'https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardList.do?bbsId=BBSMSTR_000000000008',
+  [EventSources.MsitPressRelease]: 'https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307',
+  [EventSources.KmaMicroEarthquake]: 'https://www.weather.go.kr/w/earthquake-volcano/recent.do',
+  [EventSources.KmaPewsEarthquake]: 'https://www.weather.go.kr/w/earthquake-volcano/recent.do',
+  [EventSources.NfdsFireDispatch]: 'https://nfds.go.kr/dashboard/monitor.do',
+  [EventSources.KmaWeatherWarning]: 'https://www.weather.go.kr/w/special-report/overall.do',
+  [EventSources.UticTrafficIncident]: 'https://www.utic.go.kr/map/map.do?menu=incident',
+  [EventSources.AirkoreaPmWarning]: 'https://www.airkorea.or.kr/web/pmWarning?pMENU_NO=115',
+  [EventSources.AirkoreaO3Warning]: 'https://www.airkorea.or.kr/web/o3Warning?pMENU_NO=116',
+  [EventSources.FloodAlert]: 'https://m.flood.go.kr/floodList.do',
+  [EventSources.ForestFireInfo]: 'https://fd.forest.go.kr/ffas/pubConn/movePage/sub1.do',
+  [EventSources.ForestFireWarning]: 'https://fd.forest.go.kr/ffas/index.jsp',
+  [EventSources.LandslideForecast]: 'https://sansatai.forest.go.kr/',
+  [EventSources.NcscCyberCrisis]: 'https://www.ncsc.go.kr/PageLink.do',
+  [EventSources.NctcTerrorAlert]: 'http://www.nctc.go.kr/nctc/information/alertIssuanceStatus.do',
+  [EventSources.KpxPowerSupply]: 'https://new.kpx.or.kr/',
+  [EventSources.KasaSpaceWeatherWarning]: 'https://spaceweather.kasa.go.kr/Alarm.do',
+  [EventSources.YnaNews]: 'https://www.yna.co.kr/',
+};
+
+export const getEventSourceLink = (sourceId: number): string | null =>
+  EVENT_SOURCE_LINKS[sourceId as EventSources] ?? null;
 
 export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.SafekoreaSms,
@@ -194,6 +224,7 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.NcscCyberCrisis,
   EventSources.NctcTerrorAlert,
   EventSources.KpxPowerSupply,
+  EventSources.KasaSpaceWeatherWarning,
   EventSources.YnaNews,
 ];
 

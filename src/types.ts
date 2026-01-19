@@ -46,6 +46,7 @@ export enum EventKinds {
   CrowdDensity = 37,
   WildAnimal = 38,
   Cyber = 39,
+  SpaceWeather = 40,
 }
 
 export enum EventSources {
@@ -67,6 +68,7 @@ export enum EventSources {
   LandslideForecast = 16,
   MoisPressRelease = 17,
   MsitPressRelease = 18,
+  KasaSpaceWeatherWarning = 19,
 }
 
 export type EventGeo = {
