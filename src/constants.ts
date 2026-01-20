@@ -156,6 +156,7 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.KpxPowerSupply]: '산업부\n(전력)',
   [EventSources.YnaNews]: '연합\n뉴스',
   [EventSources.KasaSpaceWeatherWarning]: '우주청\n(환경)',
+  [EventSources.KasaSpaceWeatherCrisisAlert]: '우주청\n(경보)',
 };
 
 export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
@@ -178,6 +179,7 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.KpxPowerSupply]: '산업부',
   [EventSources.YnaNews]: '연합뉴스',
   [EventSources.KasaSpaceWeatherWarning]: '우주청',
+  [EventSources.KasaSpaceWeatherCrisisAlert]: '우주청',
 };
 
 export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
@@ -200,6 +202,7 @@ export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
   [EventSources.NctcTerrorAlert]: 'http://www.nctc.go.kr/nctc/information/alertIssuanceStatus.do',
   [EventSources.KpxPowerSupply]: 'https://new.kpx.or.kr/',
   [EventSources.KasaSpaceWeatherWarning]: 'https://spaceweather.kasa.go.kr/Alarm.do',
+  [EventSources.KasaSpaceWeatherCrisisAlert]: 'https://spaceweather.kasa.go.kr/Alarm.do',
   [EventSources.YnaNews]: 'https://www.yna.co.kr/',
 };
 
@@ -225,6 +228,7 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.NctcTerrorAlert,
   EventSources.KpxPowerSupply,
   EventSources.KasaSpaceWeatherWarning,
+  EventSources.KasaSpaceWeatherCrisisAlert,
   EventSources.YnaNews,
 ];
 
