@@ -66,19 +66,32 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                       transition={highlightTransition}
                     />
                   )}
-                  <div className="flex justify-between items-start mb-1.5 md:mb-2">
+                  <div className="flex justify-between items-start gap-2 mb-1.5 md:mb-2">
                     <span
                       className={`px-1.5 py-0.5 rounded text-[8px] md:text-[10px] font-bold ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}
                     >
                       {LEVEL_CONFIG[event.level].label}
                     </span>
-                    <span className="text-[8px] md:text-[10px] text-slate-500 font-bold">
-                      {formatRelativeTime(event.timestamp)}
-                    </span>
+                    <div className="flex items-center gap-1 text-[8px] md:text-[10px] font-semibold text-slate-400">
+                      <span>{event.category}</span>
+                      <span>·</span>
+                      <span>{formatRelativeTime(event.timestamp)}</span>
+                      <span>·</span>
+                      <EventSourceLink
+                        sourceId={event.sourceId}
+                        label={event.source}
+                        className="text-slate-400 hover:text-slate-200 transition"
+                        decorationClassName="decoration-slate-400/50 hover:decoration-slate-300/70"
+                      />
+                    </div>
                   </div>
 
-                  <h3 className="font-bold text-xs md:text-sm text-slate-100 leading-snug mb-1.5 md:mb-2 whitespace-pre-line break-all flex items-center gap-1">
-                    <span className="text-[12px] md:text-[14px] leading-none" aria-hidden="true">
+                  <h3
+                    className={`font-bold text-xs md:text-sm text-slate-100 leading-snug whitespace-pre-line break-all flex items-center gap-1 ${
+                      event.content ? 'mb-1.5 md:mb-2' : 'mb-0'
+                    }`}
+                  >
+                    <span className="text-[12px] md:text-[14px] leading-none" title={event.category} aria-hidden="true">
                       {getEventKindIcon(event.kind)}
                     </span>
                     <span className="min-w-0">{event.title}</span>
@@ -88,19 +101,6 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                       {event.content}
                     </p>
                   )}
-
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-[8px] md:text-[10px] font-semibold text-slate-400">
-                      <EventSourceLink
-                        sourceId={event.sourceId}
-                        label={event.source}
-                        className="text-slate-400 hover:text-slate-200 transition"
-                        decorationClassName="decoration-slate-400/50 hover:decoration-slate-300/70"
-                      />
-                      {' · '}
-                      {event.category}
-                    </span>
-                  </div>
 
                   {event.level === EventLevels.Critical && (
                     <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 bg-red-600/10 rounded-full -mr-6 -mt-6 animate-pulse" />
