@@ -71,7 +71,7 @@ const CategoryEventCard = ({ event, isPrimary }: CategoryEventCardProps) => {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-0.5">
             <span
-              className={`text-[7px] md:text-[8px] font-black px-1 rounded-sm uppercase ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}
+              className={`text-[7px] md:text-[8px] font-semibold px-1 rounded-sm uppercase ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}
             >
               {LEVEL_CONFIG[event.level].label}
             </span>
