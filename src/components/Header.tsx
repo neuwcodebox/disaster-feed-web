@@ -4,7 +4,93 @@ import { Activity, Clock, Users, Volume2, VolumeOff } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import { fetchStreamClientsTotal } from '../api';
-import type { SourceStatus } from '../types';
+import { EVENT_SOURCE_LABELS } from '../constants';
+import type { EventSources, SourceStatus } from '../types';
+
+type StatusDisplayState = 'connected' | 'partial' | 'disconnected';
+
+type StatusDisplayItem = {
+  key: string;
+  label: string;
+  state: StatusDisplayState;
+  title?: string;
+};
+
+type StatusGroup = {
+  label: string;
+  total: number;
+  connected: number;
+  items: string[];
+};
+
+const STATUS_VISUALS: Record<StatusDisplayState, { dot: string; text: string }> = {
+  connected: {
+    dot: 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.55)]',
+    text: 'text-slate-400',
+  },
+  partial: {
+    dot: 'bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.55)]',
+    text: 'text-yellow-300',
+  },
+  disconnected: {
+    dot: 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.55)] animate-pulse',
+    text: 'text-red-400',
+  },
+};
+
+const resolveStatusGroupLabel = (source: SourceStatus): string =>
+  EVENT_SOURCE_LABELS[source.sourceId as EventSources] ?? source.name;
+
+const buildStatusItems = (sourceStatuses: SourceStatus[]): StatusDisplayItem[] => {
+  const groups: StatusGroup[] = [];
+  const groupIndexByKey = new Map<string, number>();
+
+  for (let i = 0; i < sourceStatuses.length; i += 1) {
+    const source = sourceStatuses[i];
+    const groupLabel = resolveStatusGroupLabel(source);
+    const key = groupLabel;
+    let index = groupIndexByKey.get(key);
+
+    if (index === undefined) {
+      index = groups.length;
+      groupIndexByKey.set(key, index);
+      groups.push({
+        label: groupLabel,
+        total: 0,
+        connected: 0,
+        items: [],
+      });
+    }
+
+    const group = groups[index];
+    group.total += 1;
+    if (source.isConnected) {
+      group.connected += 1;
+    }
+    const itemLabel = source.isConnected ? source.name : `(X)${source.name}`;
+    group.items.push(itemLabel);
+  }
+
+  const items: StatusDisplayItem[] = [];
+  for (let i = 0; i < groups.length; i += 1) {
+    const group = groups[i];
+    let state: StatusDisplayState = 'partial';
+    if (group.connected === 0) {
+      state = 'disconnected';
+    } else if (group.connected === group.total) {
+      state = 'connected';
+    }
+    const countText = `${group.connected}/${group.total}`;
+    items.push({
+      key: group.label,
+      label: `${group.label}\n(${countText})`,
+      state,
+      title: `${group.label} (${countText})\n${group.items.join(', ')}`,
+    });
+  }
+
+  return items;
+};
 
 interface HeaderProps {
   sourceStatuses: SourceStatus[];
@@ -15,6 +101,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }) => {
   const [now, setNow] = useState(new Date());
   const [streamClientTotal, setStreamClientTotal] = useState<number | null>(null);
+  const statusItems = buildStatusItems(sourceStatuses);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -80,23 +167,22 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
             <span className="text-[7px] font-black text-slate-500 uppercase leading-none tracking-tighter">STATUS</span>
           </div>
           <div className="flex items-start justify-center gap-x-1 gap-y-0.5 md:gap-x-1.5 md:gap-y-1 min-w-0">
-            {sourceStatuses.map((source) => (
-              <div key={source.sourceId} className="flex flex-col items-center min-w-0">
-                <div
-                  className={`w-1 h-1 md:w-2 md:h-2 rounded-full mb-0.5 transition-all duration-500 ${
-                    source.isConnected
-                      ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.55)]'
-                      : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.55)] animate-pulse'
-                  }`}
-                />
-                <span
-                  title={source.name}
-                  className={`hidden sm:block text-[7px] md:text-[9px] font-semibold leading-tight whitespace-pre-line wrap-break-word text-center max-w-14 md:max-w-20 ${source.isConnected ? 'text-slate-400' : 'text-red-400'}`}
-                >
-                  {source.name}
-                </span>
-              </div>
-            ))}
+            {statusItems.map((item) => {
+              const visuals = STATUS_VISUALS[item.state];
+              return (
+                <div key={item.key} className="flex flex-col items-center min-w-0">
+                  <div
+                    className={`w-1 h-1 md:w-2 md:h-2 rounded-full mb-0.5 transition-all duration-500 ${visuals.dot}`}
+                  />
+                  <span
+                    title={item.title ?? item.label}
+                    className={`hidden sm:block text-[7px] md:text-[9px] font-semibold leading-tight whitespace-pre-line wrap-break-word text-center max-w-14 md:max-w-20 ${visuals.text}`}
+                  >
+                    {item.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
