@@ -9,6 +9,7 @@ interface CategorySparklineProps {
 const HOUR_MS = 60 * 60 * 1000;
 const MIN_BAR_HEIGHT = 1.5;
 const CAP_HEIGHT = 1.5;
+const BASELINE_MAX_SCORE = 5;
 
 const LEVEL_BAR_COLOR: Record<EventLevels, string> = {
   [EventLevels.Info]: 'text-slate-400',
@@ -48,8 +49,8 @@ const CategorySparkline: React.FC<CategorySparklineProps> = ({ metrics, hours = 
       maxScore = buckets[i];
     }
   }
-  const displayMaxScore = maxScore;
-  const normalizedMaxScore = maxScore === 0 ? 1 : maxScore;
+  const displayMaxScore = Math.max(BASELINE_MAX_SCORE, maxScore);
+  const normalizedMaxScore = displayMaxScore;
 
   const width = 72;
   const height = 18;
