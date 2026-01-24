@@ -181,10 +181,14 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
             className="grid h-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4"
           >
             {pageGroups.map((group) => {
-              let highestLevel = group.latestEvent.level;
-              for (const event of group.events) {
-                if (event.level > highestLevel) {
-                  highestLevel = event.level;
+              const metrics = metricsByCategory[group.category];
+
+              let highestLevel = EventLevels.Info;
+              if (metrics && metrics.length > 0) {
+                for (const m of metrics) {
+                  if (m.level > highestLevel) {
+                    highestLevel = m.level;
+                  }
                 }
               }
 
@@ -208,7 +212,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
                       </h3>
                     </div>
                     <div className="flex items-center gap-2 min-w-0">
-                      <CategorySparkline metrics={metricsByCategory[group.category] ?? []} hours={24} />
+                      <CategorySparkline metrics={metrics ?? []} hours={24} />
                       <span className="text-sm md:text-base leading-none" aria-hidden="true">
                         {getEventKindIcon(group.latestEvent.kind)}
                       </span>
