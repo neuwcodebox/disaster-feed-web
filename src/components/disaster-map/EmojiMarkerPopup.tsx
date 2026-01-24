@@ -2,7 +2,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { getEventKindIcon } from '../../constants';
+import { getEventKindIcon, LEVEL_CONFIG } from '../../constants';
 import EventSourceLink from '../EventSourceLink';
 import type { EmojiLabel, EmojiMarker } from './DisasterMapTypes';
 
@@ -126,12 +126,17 @@ const EmojiMarkerPopup: React.FC<EmojiMarkerPopupProps> = ({
         </div>
         <div className="mt-2 space-y-1.5">
           {visibleEvents.map((event) => (
-            <div key={event.id} className="flex items-start gap-2">
-              <span className="text-base leading-none" aria-hidden="true">
-                {getEventKindIcon(event.kind)}
-              </span>
+            <div key={event.id} className="flex items-start gap-1.5">
+              <div className="flex h-4 items-center">
+                <span className={`h-1 w-1 shrink-0 rounded-full ${LEVEL_CONFIG[event.level].bg}`} />
+              </div>
               <div className="min-w-0">
-                <div className="truncate text-xs font-semibold text-slate-100">{event.title}</div>
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <span className="truncate text-xs font-semibold text-slate-100">{event.title}</span>
+                  <span className="shrink-0 text-base leading-none" aria-hidden="true">
+                    {getEventKindIcon(event.kind)}
+                  </span>
+                </div>
                 {event.content && (
                   <div className="mt-0.5 truncate text-[10px] font-medium text-slate-400">{event.content}</div>
                 )}
