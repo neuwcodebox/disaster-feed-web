@@ -10,7 +10,8 @@ import {
   toDisasterEvent,
   toEventMetric,
 } from '../api';
-import { EVENT_KIND_VALUES } from '../constants';
+import { SIDEBAR_EVENT_LIMIT } from '../config/appRuntime';
+import { EVENT_KIND_VALUES, SIDEBAR_MIN_LEVEL } from '../constants';
 import type { DisasterEvent, EventLevels, EventMetric, SourceStatus } from '../types';
 import { filterEventsByAge, filterMetricsByAge } from '../utils/eventFilters';
 import {
@@ -46,10 +47,19 @@ const hasItemId = <T extends { id: string }>(items: T[], targetId: string): bool
   return false;
 };
 
-const mergeEvents = (allEvents: ApiEvent[], kindResults: PromiseSettledResult<ApiEvent[]>[]): ApiEvent[] => {
+const mergeEvents = (
+  allEvents: ApiEvent[],
+  kindResults: PromiseSettledResult<ApiEvent[]>[],
+  extraEvents?: ApiEvent[],
+): ApiEvent[] => {
   const combined: ApiEvent[] = [];
   for (let i = 0; i < allEvents.length; i += 1) {
     combined.push(allEvents[i]);
+  }
+  if (extraEvents) {
+    for (let i = 0; i < extraEvents.length; i += 1) {
+      combined.push(extraEvents[i]);
+    }
   }
   for (let i = 0; i < kindResults.length; i += 1) {
     const result = kindResults[i];
@@ -100,6 +110,8 @@ const dedupeAndMapEvents = (items: ApiEvent[]): DisasterEvent[] => {
   }
   return Array.from(mappedById.values());
 };
+
+const isSidebarPriorityEvent = (event: DisasterEvent): boolean => event.level >= SIDEBAR_MIN_LEVEL;
 
 const buildMetricsSeed = (
   metricsResults: PromiseSettledResult<ApiEventMetric[]>[],
@@ -207,7 +219,7 @@ export const useDisasterStream = ({
         }
         const next = insertSorted(prev, mappedEvent, compareEventsByOccurrence);
         const recent = filterEventsByAge(next, now, maxEventAgeMs);
-        return limitEventsByCategory(recent, maxEventsPerCategory);
+        return limitEventsByCategory(recent, maxEventsPerCategory, isSidebarPriorityEvent);
       });
 
       const metric = toMetricFromEvent(mappedEvent);
@@ -234,6 +246,11 @@ export const useDisasterStream = ({
         const metricsSince = new Date(now - metricsWindowMs);
 
         const allEventsPromise = fetchEvents({ since: eventsSince });
+        const sidebarEventsPromise = fetchEvents({
+          minLevel: SIDEBAR_MIN_LEVEL,
+          limit: SIDEBAR_EVENT_LIMIT,
+          since: eventsSince,
+        });
 
         const eventKindPromises: Promise<ApiEvent[]>[] = [];
         const metricKindPromises: Promise<ApiEventMetric[]>[] = [];
@@ -243,17 +260,18 @@ export const useDisasterStream = ({
           metricKindPromises.push(fetchEventMetrics({ kind, limit: metricsFetchLimit, since: metricsSince }));
         }
 
-        const [allEvents, eventsKindResults, metricsKindResults] = await Promise.all([
+        const [allEvents, sidebarEvents, eventsKindResults, metricsKindResults] = await Promise.all([
           allEventsPromise,
+          sidebarEventsPromise,
           Promise.allSettled(eventKindPromises),
           Promise.allSettled(metricKindPromises),
         ]);
 
-        const combined = mergeEvents(allEvents, eventsKindResults);
+        const combined = mergeEvents(allEvents, eventsKindResults, sidebarEvents);
         const mapped = dedupeAndMapEvents(combined);
         mapped.sort(compareEventsByOccurrence);
         const recent = filterEventsByAge(mapped, now, maxEventAgeMs);
-        const limited = limitEventsByCategory(recent, maxEventsPerCategory);
+        const limited = limitEventsByCategory(recent, maxEventsPerCategory, isSidebarPriorityEvent);
 
         const metricsSeed = buildMetricsSeed(metricsKindResults, mapped);
         metricsSeed.sort(compareMetricsByOccurrence);

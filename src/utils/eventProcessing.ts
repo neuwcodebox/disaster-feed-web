@@ -39,11 +39,19 @@ export const compareEventsByScoreStatic = (a: DisasterEvent, b: DisasterEvent): 
   return compareEventsByOccurrence(a, b);
 };
 
-export const limitEventsByCategory = (items: DisasterEvent[], maxPerCategory: number): DisasterEvent[] => {
+export const limitEventsByCategory = (
+  items: DisasterEvent[],
+  maxPerCategory: number,
+  isExempt?: (event: DisasterEvent) => boolean,
+): DisasterEvent[] => {
   const counts = new Map<string, number>();
   const limited: DisasterEvent[] = [];
   for (let i = 0; i < items.length; i += 1) {
     const event = items[i];
+    if (isExempt?.(event)) {
+      limited.push(event);
+      continue;
+    }
     const count = counts.get(event.category) ?? 0;
     if (count >= maxPerCategory) {
       continue;

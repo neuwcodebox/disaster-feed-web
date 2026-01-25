@@ -64,6 +64,7 @@ type EventsQueryOptions = {
   kind?: number;
   limit?: number;
   since?: Date;
+  minLevel?: number;
 };
 
 const resolveBaseUrl = (): string => {
@@ -161,10 +162,13 @@ export const fetchStreamClientsTotal = async (): Promise<number> => {
 };
 
 export const fetchEvents = async (options?: EventsQueryOptions): Promise<ApiEvent[]> => {
-  const { kind, limit = 10, since } = options ?? {};
+  const { kind, limit = 10, since, minLevel } = options ?? {};
   const url = new URL(buildApiUrl('/api/events'));
   if (kind != null) {
     url.searchParams.set('kind', kind.toString());
+  }
+  if (minLevel != null) {
+    url.searchParams.set('minLevel', minLevel.toString());
   }
   url.searchParams.set('limit', limit.toString());
   if (since) {
