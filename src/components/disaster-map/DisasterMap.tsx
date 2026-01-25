@@ -6,6 +6,7 @@ import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { MAX_EVENTS_PER_CATEGORY } from '../../config/appRuntime';
 import { type DisasterEvent, EventLevels } from '../../types';
 import { filterEventsByAge } from '../../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
@@ -845,7 +846,12 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 sm:inset-x-5 sm:bottom-5">
           <div className="pointer-events-auto flex flex-col gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/85 p-3 shadow-[0_16px_36px_rgba(2,6,23,0.55)] backdrop-blur md:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs md:text-sm">
-              <div className="flex items-center gap-2 font-semibold text-slate-200">최근 {windowLabel}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-200">최근 {windowLabel}</span>
+                <span className="text-[10px] md:text-xs text-slate-500">
+                  유형별 최대 약 {MAX_EVENTS_PER_CATEGORY}건 표시
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setWindowAgeMs(maxEventAgeMs)}
