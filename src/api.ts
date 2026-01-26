@@ -21,12 +21,12 @@ const schemaEvent = z.object({
   source: z.enum(EventSources),
   kind: z.enum(EventKinds),
   title: z.string(),
-  body: z.string().nullable(),
+  body: z.string().optional(),
   fetchedAt: z.string(),
   occurredAt: z.string().nullable(),
-  regionText: z.string().nullable(),
-  geo: schemaGeo.nullable().optional(),
-  regionCodes: z.array(z.string()).nullable().optional(),
+  regionText: z.string().optional(),
+  geo: schemaGeo.optional(),
+  regionCodes: z.array(z.string()).optional(),
   level: z.enum(EventLevels),
 });
 
