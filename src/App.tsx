@@ -7,14 +7,7 @@ import FooterMarquee from './components/FooterMarquee';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import UpdateNotifier from './components/UpdateNotifier';
-import {
-  MAP_LARGE_SCREEN_QUERY,
-  MAX_EVENT_AGE_MS,
-  MAX_EVENTS_PER_CATEGORY,
-  METRICS_FETCH_LIMIT,
-  METRICS_WINDOW_MS,
-  SIDEBAR_EVENT_LIMIT,
-} from './config/appRuntime';
+import { MAP_LARGE_SCREEN_QUERY, MAX_EVENT_AGE_MS, SIDEBAR_EVENT_LIMIT } from './config/appRuntime';
 import { SIDEBAR_MIN_LEVEL } from './constants';
 import { useAlertSound } from './hooks/useAlertSound';
 import { useDisasterStream } from './hooks/useDisasterStream';
@@ -107,16 +100,11 @@ const App: React.FC = () => {
   const { handleAlertLevel } = useAlertSound({ isMuted });
   const { events, metrics, sourceStatuses } = useDisasterStream({
     maxEventAgeMs: MAX_EVENT_AGE_MS,
-    metricsWindowMs: METRICS_WINDOW_MS,
-    metricsFetchLimit: METRICS_FETCH_LIMIT,
-    maxEventsPerCategory: MAX_EVENTS_PER_CATEGORY,
     onAlertLevel: handleAlertLevel,
   });
   const nowMs = useExpiryClock({
     events,
-    metrics,
     maxEventAgeMs: MAX_EVENT_AGE_MS,
-    metricsWindowMs: METRICS_WINDOW_MS,
   });
 
   useEffect(() => {
@@ -143,9 +131,10 @@ const App: React.FC = () => {
   }, []);
 
   const recentEvents = useMemo(() => filterEventsByAge(events, nowMs, MAX_EVENT_AGE_MS), [events, nowMs]);
-  const recentMetrics = useMemo(() => filterMetricsByAge(metrics, nowMs, METRICS_WINDOW_MS), [metrics, nowMs]);
-
-  const metricsByCategory = useMemo(() => buildMetricsByCategory(recentMetrics), [recentMetrics]);
+  const metricsByCategory = useMemo(
+    () => buildMetricsByCategory(filterMetricsByAge(metrics, nowMs, MAX_EVENT_AGE_MS)),
+    [metrics, nowMs],
+  );
   const sidebarEvents = useMemo(
     () => buildSidebarEvents(recentEvents, SIDEBAR_MIN_LEVEL, SIDEBAR_EVENT_LIMIT),
     [recentEvents],

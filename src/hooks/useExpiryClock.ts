@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { DisasterEvent, EventMetric } from '../types';
+import type { DisasterEvent } from '../types';
 
 type UseExpiryClockOptions = {
   events: DisasterEvent[];
-  metrics: EventMetric[];
   maxEventAgeMs: number;
-  metricsWindowMs: number;
 };
 
 const findOldestWithinWindow = <T extends { timestamp: number }>(items: T[], threshold: number): T | null => {
@@ -18,10 +16,7 @@ const findOldestWithinWindow = <T extends { timestamp: number }>(items: T[], thr
   return null;
 };
 
-const getNextExpiryMs = (
-  { events, metrics, maxEventAgeMs, metricsWindowMs }: UseExpiryClockOptions,
-  nowMs: number,
-): number | null => {
+const getNextExpiryMs = ({ events, maxEventAgeMs }: UseExpiryClockOptions, nowMs: number): number | null => {
   let nextExpiry: number | null = null;
 
   if (maxEventAgeMs > 0 && events.length > 0) {
@@ -32,40 +27,26 @@ const getNextExpiryMs = (
     }
   }
 
-  if (metricsWindowMs > 0 && metrics.length > 0) {
-    const threshold = nowMs - metricsWindowMs;
-    const oldestMetric = findOldestWithinWindow(metrics, threshold);
-    if (oldestMetric) {
-      const metricExpiry = oldestMetric.timestamp + metricsWindowMs;
-      if (nextExpiry === null || metricExpiry < nextExpiry) {
-        nextExpiry = metricExpiry;
-      }
-    }
-  }
-
   return nextExpiry;
 };
 
 export const useExpiryClock = (options: UseExpiryClockOptions): number => {
-  const { events, metrics, maxEventAgeMs, metricsWindowMs } = options;
+  const { events, maxEventAgeMs } = options;
   const [nowMs, setNowMs] = useState(() => Date.now());
   const latestEventTimestamp = events[0]?.timestamp ?? 0;
-  const latestMetricTimestamp = metrics[0]?.timestamp ?? 0;
 
   useEffect(() => {
-    if (latestEventTimestamp === 0 && latestMetricTimestamp === 0) {
+    if (latestEventTimestamp === 0) {
       return;
     }
     setNowMs(Date.now());
-  }, [latestEventTimestamp, latestMetricTimestamp]);
+  }, [latestEventTimestamp]);
 
   useEffect(() => {
     const nextExpiry = getNextExpiryMs(
       {
         events,
-        metrics,
         maxEventAgeMs,
-        metricsWindowMs,
       },
       nowMs,
     );
@@ -81,7 +62,7 @@ export const useExpiryClock = (options: UseExpiryClockOptions): number => {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [events, metrics, maxEventAgeMs, metricsWindowMs, nowMs]);
+  }, [events, maxEventAgeMs, nowMs]);
 
   return nowMs;
 };

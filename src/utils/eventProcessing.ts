@@ -74,10 +74,3 @@ export const insertSorted = <T>(items: T[], item: T, compare: (left: T, right: T
   next.splice(insertIndex, 0, item);
   return next;
 };
-
-export const toMetricFromEvent = (event: DisasterEvent): EventMetric => ({
-  id: event.id,
-  category: event.category,
-  level: event.level,
-  timestamp: event.timestamp,
-});

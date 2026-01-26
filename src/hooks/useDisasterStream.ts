@@ -1,33 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  type ApiEvent,
-  type ApiEventMetric,
-  createEventSource,
-  fetchEventMetrics,
-  fetchEvents,
-  fetchSourceStatuses,
-  parseEventData,
-  toDisasterEvent,
-  toEventMetric,
-} from '../api';
-import { SIDEBAR_EVENT_LIMIT } from '../config/appRuntime';
-import { EVENT_KIND_VALUES, SIDEBAR_MIN_LEVEL } from '../constants';
+import { createEventSource, fetchEvents, fetchSourceStatuses, parseEventData, toDisasterEvent } from '../api';
+import { INITIAL_EVENTS_FETCH_LIMIT } from '../config/appRuntime';
 import type { DisasterEvent, EventLevels, EventMetric, SourceStatus } from '../types';
-import { filterEventsByAge, filterMetricsByAge } from '../utils/eventFilters';
-import {
-  compareEventsByOccurrence,
-  compareMetricsByOccurrence,
-  insertSorted,
-  limitEventsByCategory,
-  toMetricFromEvent,
-} from '../utils/eventProcessing';
+import { filterEventsByAge } from '../utils/eventFilters';
+import { compareEventsByOccurrence, insertSorted } from '../utils/eventProcessing';
 import { INITIAL_SOURCE_STATUSES } from '../utils/sourceStatuses';
 
 type UseDisasterStreamOptions = {
   maxEventAgeMs: number;
-  metricsWindowMs: number;
-  metricsFetchLimit: number;
-  maxEventsPerCategory: number;
   onAlertLevel: (level: EventLevels) => void;
 };
 
@@ -45,33 +25,6 @@ const hasItemId = <T extends { id: string }>(items: T[], targetId: string): bool
     }
   }
   return false;
-};
-
-const mergeEvents = (
-  allEvents: ApiEvent[],
-  kindResults: PromiseSettledResult<ApiEvent[]>[],
-  extraEvents?: ApiEvent[],
-): ApiEvent[] => {
-  const combined: ApiEvent[] = [];
-  for (let i = 0; i < allEvents.length; i += 1) {
-    combined.push(allEvents[i]);
-  }
-  if (extraEvents) {
-    for (let i = 0; i < extraEvents.length; i += 1) {
-      combined.push(extraEvents[i]);
-    }
-  }
-  for (let i = 0; i < kindResults.length; i += 1) {
-    const result = kindResults[i];
-    if (result.status === 'fulfilled') {
-      for (let j = 0; j < result.value.length; j += 1) {
-        combined.push(result.value[j]);
-      }
-    } else {
-      console.warn('Failed to fetch events by kind', result.reason);
-    }
-  }
-  return combined;
 };
 
 const buildKnownEventCache = (items: DisasterEvent[]): Map<string, number> => {
@@ -99,56 +52,6 @@ const pruneKnownEventCache = (cache: Map<string, number>, now: number, maxAgeMs:
   }
 };
 
-const dedupeAndMapEvents = (items: ApiEvent[]): DisasterEvent[] => {
-  const mappedById = new Map<string, DisasterEvent>();
-  for (let i = 0; i < items.length; i += 1) {
-    const mappedEvent = toDisasterEvent(items[i]);
-    const existing = mappedById.get(mappedEvent.id);
-    if (!existing || mappedEvent.timestamp > existing.timestamp) {
-      mappedById.set(mappedEvent.id, mappedEvent);
-    }
-  }
-  return Array.from(mappedById.values());
-};
-
-const isSidebarPriorityEvent = (event: DisasterEvent): boolean => event.level >= SIDEBAR_MIN_LEVEL;
-
-const buildMetricsSeed = (
-  metricsResults: PromiseSettledResult<ApiEventMetric[]>[],
-  mappedEvents: DisasterEvent[],
-): EventMetric[] => {
-  const metricsSeed: EventMetric[] = [];
-  let hasMetricsResponse = false;
-  const missingMetricKinds: number[] = [];
-  for (let i = 0; i < metricsResults.length; i += 1) {
-    const result = metricsResults[i];
-    const kind = EVENT_KIND_VALUES[i];
-    if (result.status === 'fulfilled') {
-      hasMetricsResponse = true;
-      for (let j = 0; j < result.value.length; j += 1) {
-        metricsSeed.push(toEventMetric(result.value[j]));
-      }
-    } else {
-      missingMetricKinds.push(kind);
-      console.warn('Failed to fetch event metrics by kind', kind, result.reason);
-    }
-  }
-  if (!hasMetricsResponse) {
-    for (let i = 0; i < mappedEvents.length; i += 1) {
-      metricsSeed.push(toMetricFromEvent(mappedEvents[i]));
-    }
-  } else if (missingMetricKinds.length > 0) {
-    const missingKindSet = new Set(missingMetricKinds);
-    for (let i = 0; i < mappedEvents.length; i += 1) {
-      const event = mappedEvents[i];
-      if (missingKindSet.has(event.kind)) {
-        metricsSeed.push(toMetricFromEvent(event));
-      }
-    }
-  }
-  return metricsSeed;
-};
-
 const updateSourceStatuses = (prev: SourceStatus[], event: DisasterEvent, now: number): SourceStatus[] => {
   const next = prev.slice();
   for (let i = 0; i < next.length; i += 1) {
@@ -168,13 +71,7 @@ const updateSourceStatuses = (prev: SourceStatus[], event: DisasterEvent, now: n
   ];
 };
 
-export const useDisasterStream = ({
-  maxEventAgeMs,
-  metricsWindowMs,
-  metricsFetchLimit,
-  maxEventsPerCategory,
-  onAlertLevel,
-}: UseDisasterStreamOptions) => {
+export const useDisasterStream = ({ maxEventAgeMs, onAlertLevel }: UseDisasterStreamOptions) => {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
   const [metrics, setMetrics] = useState<EventMetric[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
@@ -182,7 +79,6 @@ export const useDisasterStream = ({
   const lastEventIdRef = useRef<string | null>(null);
   const knownEventCacheRef = useRef<Map<string, number>>(new Map());
   const onAlertLevelRef = useRef(onAlertLevel);
-  const maxKnownAgeMs = Math.max(maxEventAgeMs, metricsWindowMs);
 
   useEffect(() => {
     onAlertLevelRef.current = onAlertLevel;
@@ -204,12 +100,12 @@ export const useDisasterStream = ({
       const now = Date.now();
       const knownEventCache = knownEventCacheRef.current;
       if (knownEventCache.has(mappedEvent.id)) {
-        pruneKnownEventCache(knownEventCache, now, maxKnownAgeMs);
+        pruneKnownEventCache(knownEventCache, now, maxEventAgeMs);
         return;
       }
 
       knownEventCache.set(mappedEvent.id, mappedEvent.timestamp);
-      pruneKnownEventCache(knownEventCache, now, maxKnownAgeMs);
+      pruneKnownEventCache(knownEventCache, now, maxEventAgeMs);
 
       onAlertLevelRef.current(mappedEvent.level);
 
@@ -219,22 +115,17 @@ export const useDisasterStream = ({
         }
         const next = insertSorted(prev, mappedEvent, compareEventsByOccurrence);
         const recent = filterEventsByAge(next, now, maxEventAgeMs);
-        return limitEventsByCategory(recent, maxEventsPerCategory, isSidebarPriorityEvent);
-      });
-
-      const metric = toMetricFromEvent(mappedEvent);
-      setMetrics((prev) => {
-        if (hasItemId(prev, metric.id)) {
-          return prev;
-        }
-        const next = insertSorted(prev, metric, compareMetricsByOccurrence);
-        return filterMetricsByAge(next, now, metricsWindowMs);
+        return recent;
       });
 
       setSourceStatuses((prev) => updateSourceStatuses(prev, mappedEvent, now));
     },
-    [maxEventAgeMs, maxEventsPerCategory, maxKnownAgeMs, metricsWindowMs],
+    [maxEventAgeMs],
   );
+
+  useEffect(() => {
+    setMetrics(events);
+  }, [events]);
 
   useEffect(() => {
     let isActive = true;
@@ -243,46 +134,25 @@ export const useDisasterStream = ({
       try {
         const now = Date.now();
         const eventsSince = new Date(now - maxEventAgeMs);
-        const metricsSince = new Date(now - metricsWindowMs);
 
-        const allEventsPromise = fetchEvents({ since: eventsSince });
-        const sidebarEventsPromise = fetchEvents({
-          minLevel: SIDEBAR_MIN_LEVEL,
-          limit: SIDEBAR_EVENT_LIMIT,
+        const fetchedEvents = await fetchEvents({
           since: eventsSince,
+          limit: INITIAL_EVENTS_FETCH_LIMIT,
         });
 
-        const eventKindPromises: Promise<ApiEvent[]>[] = [];
-        const metricKindPromises: Promise<ApiEventMetric[]>[] = [];
-        for (let i = 0; i < EVENT_KIND_VALUES.length; i += 1) {
-          const kind = EVENT_KIND_VALUES[i];
-          eventKindPromises.push(fetchEvents({ kind, limit: maxEventsPerCategory, since: eventsSince }));
-          metricKindPromises.push(fetchEventMetrics({ kind, limit: metricsFetchLimit, since: metricsSince }));
+        const mapped: DisasterEvent[] = [];
+        for (let i = 0; i < fetchedEvents.length; i += 1) {
+          mapped.push(toDisasterEvent(fetchedEvents[i]));
         }
-
-        const [allEvents, sidebarEvents, eventsKindResults, metricsKindResults] = await Promise.all([
-          allEventsPromise,
-          sidebarEventsPromise,
-          Promise.allSettled(eventKindPromises),
-          Promise.allSettled(metricKindPromises),
-        ]);
-
-        const combined = mergeEvents(allEvents, eventsKindResults, sidebarEvents);
-        const mapped = dedupeAndMapEvents(combined);
         mapped.sort(compareEventsByOccurrence);
-        const recent = filterEventsByAge(mapped, now, maxEventAgeMs);
-        const limited = limitEventsByCategory(recent, maxEventsPerCategory, isSidebarPriorityEvent);
 
-        const metricsSeed = buildMetricsSeed(metricsKindResults, mapped);
-        metricsSeed.sort(compareMetricsByOccurrence);
-
-        const knownEventCache = buildKnownEventCache(recent);
-        pruneKnownEventCache(knownEventCache, now, maxKnownAgeMs);
+        const knownEventCache = buildKnownEventCache(mapped);
+        pruneKnownEventCache(knownEventCache, now, maxEventAgeMs);
 
         return {
-          events: limited,
-          metrics: filterMetricsByAge(metricsSeed, now, metricsWindowMs),
-          lastEventId: allEvents.length > 0 ? allEvents[0].id : null,
+          events: mapped,
+          metrics: mapped,
+          lastEventId: mapped.length > 0 ? mapped[0].id : null,
           knownEventCache,
         };
       } catch (error) {
@@ -320,7 +190,7 @@ export const useDisasterStream = ({
         eventSourceRef.current.close();
       }
     };
-  }, [handleIncomingEvent, maxEventAgeMs, maxEventsPerCategory, metricsFetchLimit, metricsWindowMs, maxKnownAgeMs]);
+  }, [handleIncomingEvent, maxEventAgeMs]);
 
   useEffect(() => {
     let isActive = true;
