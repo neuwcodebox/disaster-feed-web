@@ -6,7 +6,7 @@ import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { type DisasterEvent, EventLevels } from '../../types';
+import { type DisasterEvent, type EventGeo, EventLevels } from '../../types';
 import { filterEventsByAge } from '../../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
 import DisasterMapEmojiMarkers, {
@@ -47,12 +47,7 @@ interface DisasterMapProps {
   maxEventAgeMs: number;
 }
 
-type MapPoint = {
-  id: string;
-  position: [number, number];
-  level: EventLevels;
-  title: string;
-};
+type GeoEvent = DisasterEvent & { geo: EventGeo };
 
 type PulseRegionLookup = {
   codes2: Map<string, PulseRegion>;
@@ -149,6 +144,8 @@ const isNationwideLowLevelEvent = (event: DisasterEvent): boolean => {
   return isNationwideRegionCodes(event.regionCodes);
 };
 
+const isGeoEvent = (event: DisasterEvent): event is GeoEvent => Boolean(event.geo);
+
 const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
   if (incoming.length === 0) {
     return prev;
@@ -222,19 +219,14 @@ const collectRegionLevels = (events: DisasterEvent[]): RegionLevels => {
   return { codes2, codes5 };
 };
 
-const collectEventPoints = (events: DisasterEvent[]): MapPoint[] => {
-  const points: MapPoint[] = [];
+const collectGeoEvents = (events: DisasterEvent[]): GeoEvent[] => {
+  const points: GeoEvent[] = [];
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i];
-    if (!event.geo) {
+    if (!isGeoEvent(event)) {
       continue;
     }
-    points.push({
-      id: event.id,
-      position: [event.geo.lng, event.geo.lat],
-      level: event.level,
-      title: event.title,
-    });
+    points.push(event);
   }
   return points;
 };
@@ -273,23 +265,19 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     };
   }, []);
 
-  const visibleEvents = useMemo(
-    () => filterEventsByAge(events, windowNowMs, windowAgeMs),
-    [events, windowAgeMs, windowNowMs],
-  );
   const mapEvents = useMemo(() => {
-    const nextMapEvents: DisasterEvent[] = [];
-    for (let i = 0; i < visibleEvents.length; i += 1) {
-      const event = visibleEvents[i];
-      if (isNationwideLowLevelEvent(event)) {
-        continue;
+    const filteredByAge = filterEventsByAge(events, windowNowMs, windowAgeMs);
+    const filtered: DisasterEvent[] = [];
+    for (let i = 0; i < filteredByAge.length; i += 1) {
+      const event = filteredByAge[i];
+      if (!isNationwideLowLevelEvent(event)) {
+        filtered.push(event);
       }
-      nextMapEvents.push(event);
     }
-    return nextMapEvents;
-  }, [visibleEvents]);
+    return filtered;
+  }, [events, windowAgeMs, windowNowMs]);
   const regionLevels = useMemo(() => collectRegionLevels(mapEvents), [mapEvents]);
-  const eventPoints = useMemo(() => collectEventPoints(mapEvents), [mapEvents]);
+  const pointEvents = useMemo(() => collectGeoEvents(mapEvents), [mapEvents]);
   const regionIndex = useMemo<GeoRegionIndex | null>(() => {
     if (!regionData) {
       return null;
@@ -589,14 +577,14 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           })
         : null;
 
-    const pointsLayer = new ScatterplotLayer<MapPoint>({
+    const pointsLayer = new ScatterplotLayer<GeoEvent>({
       id: 'event-points',
-      data: eventPoints,
+      data: pointEvents,
       opacity: 1,
       radiusUnits: 'pixels',
-      getPosition: (point) => point.position,
-      getFillColor: (point) => LEVEL_COLORS[point.level],
-      getRadius: (point) => LEVEL_RADII[point.level] ?? 700,
+      getPosition: (event) => [event.geo.lng, event.geo.lat],
+      getFillColor: (event) => LEVEL_COLORS[event.level],
+      getRadius: (event) => LEVEL_RADII[event.level] ?? 700,
       getLineColor: [235, 248, 255, 220],
       lineWidthUnits: 'pixels',
       getLineWidth: 1.5,
@@ -634,7 +622,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
 
     return nextLayers;
   }, [
-    eventPoints,
+    pointEvents,
     pulseNow,
     pulsePoints,
     pulseRegionFeatures,
