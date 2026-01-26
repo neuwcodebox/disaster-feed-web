@@ -16,6 +16,8 @@ interface CategoryGridProps {
 
 const PAGE_DRAG_THRESHOLD = 80;
 const SCROLL_TOP_VISIBILITY_THRESHOLD = 12;
+const EVENT_LIST_INITIAL_COUNT = 10;
+const EVENT_LIST_BATCH_SIZE = 10;
 
 const pageVariants = {
   enter: (direction: number) => ({
@@ -38,8 +40,16 @@ interface CategoryEventListProps {
 
 const CategoryEventList: React.FC<CategoryEventListProps> = ({ events }) => {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(() => Math.min(EVENT_LIST_INITIAL_COUNT, events.length));
   const eventCount = events.length;
+
+  const visibleEvents = useMemo(() => events.slice(0, visibleCount), [events, visibleCount]);
+
+  useEffect(() => {
+    setVisibleCount(Math.min(EVENT_LIST_INITIAL_COUNT, eventCount));
+  }, [eventCount]);
 
   useEffect(() => {
     const node = listRef.current;
@@ -61,6 +71,7 @@ const CategoryEventList: React.FC<CategoryEventListProps> = ({ events }) => {
 
   useEffect(() => {
     const node = listRef.current;
+    const sentinel = sentinelRef.current;
     if (!node) {
       return;
     }
@@ -69,7 +80,34 @@ const CategoryEventList: React.FC<CategoryEventListProps> = ({ events }) => {
       return;
     }
     setShowScrollTop(node.scrollTop > SCROLL_TOP_VISIBILITY_THRESHOLD);
-  }, [eventCount]);
+    if (!sentinel) {
+      return;
+    }
+    if (visibleCount >= eventCount) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry || !entry.isIntersecting) {
+          return;
+        }
+        setVisibleCount((prev) => Math.min(prev + EVENT_LIST_BATCH_SIZE, eventCount));
+      },
+      {
+        root: node,
+        rootMargin: '0px 0px 120px 0px',
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [eventCount, visibleCount]);
 
   const handleScrollTop = () => {
     const node = listRef.current;
@@ -83,12 +121,13 @@ const CategoryEventList: React.FC<CategoryEventListProps> = ({ events }) => {
     <div className="flex-1 relative overflow-hidden group/list">
       <div ref={listRef} className="absolute inset-0 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
         <AnimatePresence mode="popLayout">
-          {events.map((event, idx) => {
+          {visibleEvents.map((event, idx) => {
             const isPrimary = idx === 0;
 
             return <CategoryEventCard key={event.id} event={event} isPrimary={isPrimary} />;
           })}
         </AnimatePresence>
+        <div ref={sentinelRef} className="h-6" aria-hidden="true" />
       </div>
 
       <AnimatePresence>
