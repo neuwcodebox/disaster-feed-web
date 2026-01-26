@@ -254,7 +254,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const hasSeededEventsRef = useRef(false);
   const pointEmojiLabelsRef = useRef<EmojiLabel[]>([]);
   const regionEmojiLabelsRef = useRef<EmojiLabel[]>([]);
-  const [windowAgeMs, setWindowAgeMs] = useState(maxEventAgeMs);
+  const [windowAgeMs, setWindowAgeMs] = useState(Math.round(maxEventAgeMs / 4));
   const [windowNowMs, setWindowNowMs] = useState(() => Date.now());
 
   const sliderStepMs = Math.min(WINDOW_STEP_MS, maxEventAgeMs);
