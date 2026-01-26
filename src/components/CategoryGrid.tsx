@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, LayoutGrid } from 'lucide-react';
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CATEGORY_PAGE_SIZE, getEventKindIcon, LEVEL_CONFIG } from '../constants';
 import { type CategoryGroup, type CategorySortMode, EventLevels, type EventMetric } from '../types';
 import CategoryEventCard from './CategoryEventCard';
@@ -15,6 +15,7 @@ interface CategoryGridProps {
 }
 
 const PAGE_DRAG_THRESHOLD = 80;
+const SCROLL_TOP_VISIBILITY_THRESHOLD = 12;
 
 const pageVariants = {
   enter: (direction: number) => ({
@@ -29,6 +30,85 @@ const pageVariants = {
     opacity: 0,
     x: direction > 0 ? -60 : 60,
   }),
+};
+
+interface CategoryEventListProps {
+  events: CategoryGroup['events'];
+}
+
+const CategoryEventList: React.FC<CategoryEventListProps> = ({ events }) => {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const eventCount = events.length;
+
+  useEffect(() => {
+    const node = listRef.current;
+    if (!node) {
+      return;
+    }
+
+    const updateScrollState = () => {
+      setShowScrollTop(node.scrollTop > SCROLL_TOP_VISIBILITY_THRESHOLD);
+    };
+
+    updateScrollState();
+    node.addEventListener('scroll', updateScrollState, { passive: true });
+
+    return () => {
+      node.removeEventListener('scroll', updateScrollState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const node = listRef.current;
+    if (!node) {
+      return;
+    }
+    if (eventCount === 0) {
+      setShowScrollTop(false);
+      return;
+    }
+    setShowScrollTop(node.scrollTop > SCROLL_TOP_VISIBILITY_THRESHOLD);
+  }, [eventCount]);
+
+  const handleScrollTop = () => {
+    const node = listRef.current;
+    if (!node) {
+      return;
+    }
+    node.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  return (
+    <div className="flex-1 relative overflow-hidden group/list">
+      <div ref={listRef} className="absolute inset-0 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
+        <AnimatePresence mode="popLayout">
+          {events.map((event, idx) => {
+            const isPrimary = idx === 0;
+
+            return <CategoryEventCard key={event.id} event={event} isPrimary={isPrimary} />;
+          })}
+        </AnimatePresence>
+      </div>
+
+      <AnimatePresence>
+        {showScrollTop ? (
+          <motion.button
+            type="button"
+            onClick={handleScrollTop}
+            aria-label="맨 위로"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.2 }}
+            className="absolute bottom-2 right-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-400/40 bg-slate-950/90 text-blue-200 shadow-[0_10px_20px_rgba(2,6,23,0.55),0_0_14px_rgba(59,130,246,0.2)] transition hover:text-white hover:border-blue-300 hover:bg-slate-900"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
 };
 
 const CategoryGrid: React.FC<CategoryGridProps> = ({
@@ -220,17 +300,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
                   </div>
 
                   {/* Event List */}
-                  <div className="flex-1 relative overflow-hidden group/list">
-                    <div className="absolute inset-0 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
-                      <AnimatePresence mode="popLayout">
-                        {group.events.map((event, idx) => {
-                          const isPrimary = idx === 0;
-
-                          return <CategoryEventCard key={event.id} event={event} isPrimary={isPrimary} />;
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  </div>
+                  <CategoryEventList events={group.events} />
 
                   {/* Intensity Bar - Fixed Height */}
                   <div className="h-1 w-full flex shrink-0">
