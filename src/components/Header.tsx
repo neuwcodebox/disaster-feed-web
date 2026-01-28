@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Activity, Clock, Users, Volume2, VolumeOff } from 'lucide-react';
+import { Activity, Bell, BellOff, Clock, Users } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import { fetchStreamClientsTotal } from '../api';
@@ -193,7 +193,7 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
             aria-label={isMuted ? '알림음 켜기' : '알림음 끄기'}
             className="inline-flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-full border border-slate-700 bg-slate-950/60 text-slate-200 hover:text-white hover:border-slate-500 transition"
           >
-            {isMuted ? <VolumeOff className="w-3 h-3 md:w-4 md:h-4" /> : <Volume2 className="w-3 h-3 md:w-4 md:h-4" />}
+            {isMuted ? <BellOff className="w-3 h-3 md:w-4 md:h-4" /> : <Bell className="w-3 h-3 md:w-4 md:h-4" />}
           </button>
           <div className="flex flex-col items-end">
             <div className="flex items-center space-x-1 md:space-x-2 text-base md:text-2xl font-mono font-bold text-white leading-none">
