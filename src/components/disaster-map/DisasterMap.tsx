@@ -788,7 +788,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       <div className="flex items-center justify-between px-4 py-3 bg-slate-950/90 border-b border-slate-900/80 backdrop-blur 2xl:py-5">
         <div className="flex items-center gap-2 text-sm md:text-base 2xl:text-xl font-semibold text-slate-300">
           <MapIcon className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
-          재난 지도
+          지역별 현황
         </div>
         <div className="flex items-center gap-2">
           <button
