@@ -199,10 +199,11 @@ export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
   [EventSources.ForestFireInfo]: 'https://fd.forest.go.kr/ffas/pubConn/movePage/sub1.do',
   [EventSources.ForestFireWarning]: 'https://fd.forest.go.kr/ffas/index.jsp',
   [EventSources.LandslideForecast]: 'https://sansatai.forest.go.kr/',
-  [EventSources.NcscCyberCrisis]: 'https://www.ncsc.go.kr/PageLink.do',
+  [EventSources.NcscCyberCrisis]: 'https://www.ncsc.go.kr/',
   [EventSources.NctcTerrorAlert]: 'http://www.nctc.go.kr/nctc/information/alertIssuanceStatus.do',
-  [EventSources.KpxPowerSupply]: 'https://new.kpx.or.kr/',
-  [EventSources.KasaSpaceWeatherWarning]: 'https://spaceweather.kasa.go.kr/Alarm.do',
+  [EventSources.KpxPowerSupply]: 'https://new.kpx.or.kr/maxloadForecast.es?mid=a10606010000',
+  [EventSources.KasaSpaceWeatherWarning]:
+    'https://spaceweather.kasa.go.kr/openpotal/datasetInfo/openApiInfo.do?apiCd=API01',
   [EventSources.KasaSpaceWeatherCrisisAlert]: 'https://spaceweather.kasa.go.kr/Alarm.do',
   [EventSources.YnaNews]: 'https://www.yna.co.kr/',
 };
