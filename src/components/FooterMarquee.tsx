@@ -16,6 +16,7 @@ const FooterMarquee: React.FC<FooterMarqueeProps> = ({ events }) => {
 
   useLayoutEffect(() => {
     const marqueeElement = marqueeRef.current;
+    const eventsCount = events.length;
 
     if (!marqueeElement) {
       return;
@@ -25,7 +26,7 @@ const FooterMarquee: React.FC<FooterMarqueeProps> = ({ events }) => {
       const totalWidth = marqueeElement.scrollWidth;
       const singleLoopWidth = totalWidth / 2;
 
-      if (singleLoopWidth <= 0) {
+      if (eventsCount === 0 || singleLoopWidth <= 0) {
         marqueeElement.style.setProperty('--marquee-duration', `${DEFAULT_DURATION_SECONDS}s`);
         return;
       }
@@ -46,7 +47,7 @@ const FooterMarquee: React.FC<FooterMarqueeProps> = ({ events }) => {
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [events]);
 
   return (
     <footer className="fixed inset-x-0 bottom-0 z-30 flex h-10 items-center overflow-hidden border-t border-slate-800 bg-slate-900 w-full lg:static lg:z-10 lg:h-12">
