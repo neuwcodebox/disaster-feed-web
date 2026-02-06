@@ -55,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  className={`shrink-0 w-64 lg:w-full p-3 md:p-4 rounded-xl border-l-4 md:border-l-8 ${LEVEL_CONFIG[event.level].border} bg-slate-800 shadow-lg relative overflow-hidden`}
+                  className={`select-text shrink-0 w-64 lg:w-full p-3 md:p-4 rounded-xl border-l-4 md:border-l-8 ${LEVEL_CONFIG[event.level].border} bg-slate-800 shadow-lg relative overflow-hidden`}
                 >
                   {event.isRealtime && (
                     <motion.div

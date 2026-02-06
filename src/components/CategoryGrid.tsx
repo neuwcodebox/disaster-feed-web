@@ -118,7 +118,7 @@ const CategoryEventList: React.FC<CategoryEventListProps> = ({ events }) => {
   };
 
   return (
-    <div className="flex-1 relative overflow-hidden group/list">
+    <div className="select-text flex-1 relative overflow-hidden group/list">
       <div ref={listRef} className="absolute inset-0 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
         <AnimatePresence mode="popLayout">
           {visibleEvents.map((event, idx) => {

@@ -26,6 +26,11 @@ const CategoryEventCard = ({ event, isPrimary }: CategoryEventCardProps) => {
   const isExpanded = isPrimary || isExpandedByUser;
 
   const handleToggle = () => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      return;
+    }
+
     if (isExpandable) {
       setIsExpandedByUser((prev) => !prev);
     }
@@ -43,7 +48,7 @@ const CategoryEventCard = ({ event, isPrimary }: CategoryEventCardProps) => {
       layout
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden p-2 pl-3 rounded-lg transition-all duration-300 border ${
+      className={`select-text relative overflow-hidden p-2 pl-3 rounded-lg transition-all duration-300 border ${
         isPrimary
           ? 'bg-slate-900/40 border-slate-600/30 shadow-md ring-1 ring-slate-700/30 hover:bg-slate-800/40'
           : `bg-slate-900/40 border-transparent hover:bg-slate-800/40 hover:border-slate-700/20 ${
