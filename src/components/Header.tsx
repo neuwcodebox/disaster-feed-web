@@ -94,11 +94,12 @@ const buildStatusItems = (sourceStatuses: SourceStatus[]): StatusDisplayItem[] =
 
 interface HeaderProps {
   sourceStatuses: SourceStatus[];
+  isStreamConnected: boolean;
   isMuted: boolean;
   onToggleMute: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }) => {
+const Header: React.FC<HeaderProps> = ({ sourceStatuses, isStreamConnected, isMuted, onToggleMute }) => {
   const [now, setNow] = useState(new Date());
   const [streamClientTotal, setStreamClientTotal] = useState<number | null>(null);
   const statusItems = buildStatusItems(sourceStatuses);
@@ -139,7 +140,13 @@ const Header: React.FC<HeaderProps> = ({ sourceStatuses, isMuted, onToggleMute }
   return (
     <header className="h-auto bg-slate-900 flex flex-col lg:flex-row flex-wrap items-center justify-between px-4 py-3 border-b border-slate-800 shadow-2xl relative z-20 shrink-0 gap-x-8 gap-y-3">
       <div className="flex items-center space-x-3 md:space-x-4 w-full lg:w-auto">
-        <div className="bg-red-600 p-1.5 md:p-2 rounded-lg animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.4)]">
+        <div
+          className={`p-1.5 md:p-2 rounded-lg shadow-[0_0_15px_rgba(15,23,42,0.4)] ${
+            isStreamConnected
+              ? 'bg-red-600 animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.4)]'
+              : 'bg-slate-600 shadow-[0_0_12px_rgba(71,85,105,0.35)]'
+          }`}
+        >
           <Activity className="w-5 h-5 md:w-8 md:h-8 text-white" />
         </div>
         <div className="flex flex-col">

@@ -75,6 +75,7 @@ export const useDisasterStream = ({ maxEventAgeMs, onAlertLevel }: UseDisasterSt
   const [events, setEvents] = useState<DisasterEvent[]>([]);
   const [metrics, setMetrics] = useState<EventMetric[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[]>(INITIAL_SOURCE_STATUSES);
+  const [isStreamConnected, setIsStreamConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastEventIdRef = useRef<string | null>(null);
   const knownEventCacheRef = useRef<Map<string, number>>(new Map());
@@ -165,8 +166,15 @@ export const useDisasterStream = ({ maxEventAgeMs, onAlertLevel }: UseDisasterSt
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
+      setIsStreamConnected(false);
       const stream = createEventSource(afterId);
       eventSourceRef.current = stream;
+      stream.onopen = () => {
+        setIsStreamConnected(true);
+      };
+      stream.onerror = () => {
+        setIsStreamConnected(false);
+      };
       stream.onmessage = handleIncomingEvent;
     };
 
@@ -189,6 +197,7 @@ export const useDisasterStream = ({ maxEventAgeMs, onAlertLevel }: UseDisasterSt
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
+      setIsStreamConnected(false);
     };
   }, [handleIncomingEvent, maxEventAgeMs]);
 
@@ -220,5 +229,5 @@ export const useDisasterStream = ({ maxEventAgeMs, onAlertLevel }: UseDisasterSt
     };
   }, []);
 
-  return { events, metrics, sourceStatuses };
+  return { events, metrics, sourceStatuses, isStreamConnected };
 };
