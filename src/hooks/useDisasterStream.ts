@@ -18,6 +18,8 @@ type InitialLoadResult = {
   knownEventCache: Map<string, number>;
 };
 
+const REALTIME_HIGHLIGHT_DURATION_MS = 3500;
+
 const hasItemId = <T extends { id: string }>(items: T[], targetId: string): boolean => {
   for (let i = 0; i < items.length; i += 1) {
     if (items[i].id === targetId) {
@@ -79,11 +81,40 @@ export const useDisasterStream = ({ maxEventAgeMs, onAlertLevel }: UseDisasterSt
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastEventIdRef = useRef<string | null>(null);
   const knownEventCacheRef = useRef<Map<string, number>>(new Map());
+  const realtimeResetTimerIdsRef = useRef<Set<number>>(new Set());
   const onAlertLevelRef = useRef(onAlertLevel);
 
   useEffect(() => {
     onAlertLevelRef.current = onAlertLevel;
   }, [onAlertLevel]);
+
+  const scheduleRealtimeReset = useCallback((eventId: string) => {
+    const timerId = window.setTimeout(() => {
+      realtimeResetTimerIdsRef.current.delete(timerId);
+      setEvents((prev) => {
+        let targetIndex = -1;
+        for (let i = 0; i < prev.length; i += 1) {
+          const event = prev[i];
+          if (event.id !== eventId) {
+            continue;
+          }
+          if (!event.isRealtime) {
+            return prev;
+          }
+          targetIndex = i;
+          break;
+        }
+        if (targetIndex < 0) {
+          return prev;
+        }
+
+        const next = prev.slice();
+        next[targetIndex] = { ...prev[targetIndex], isRealtime: false };
+        return next;
+      });
+    }, REALTIME_HIGHLIGHT_DURATION_MS);
+    realtimeResetTimerIdsRef.current.add(timerId);
+  }, []);
 
   const handleIncomingEvent = useCallback(
     (message: MessageEvent<string>) => {
@@ -120,13 +151,26 @@ export const useDisasterStream = ({ maxEventAgeMs, onAlertLevel }: UseDisasterSt
       });
 
       setSourceStatuses((prev) => updateSourceStatuses(prev, mappedEvent, now));
+
+      if (mappedEvent.isRealtime) {
+        scheduleRealtimeReset(mappedEvent.id);
+      }
     },
-    [maxEventAgeMs],
+    [maxEventAgeMs, scheduleRealtimeReset],
   );
 
   useEffect(() => {
     setMetrics(events);
   }, [events]);
+
+  useEffect(() => {
+    return () => {
+      for (const timerId of realtimeResetTimerIdsRef.current) {
+        window.clearTimeout(timerId);
+      }
+      realtimeResetTimerIdsRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
