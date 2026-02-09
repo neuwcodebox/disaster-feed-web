@@ -69,17 +69,6 @@ const buildApiUrl = (path: string): string => {
   return new URL(normalizedPath, normalizedBase).toString();
 };
 
-const parseDateMs = (value: string | null): number | null => {
-  if (!value) {
-    return null;
-  }
-  const ms = Date.parse(value);
-  if (Number.isNaN(ms)) {
-    return null;
-  }
-  return ms;
-};
-
 const getSourceLabel = (sourceId: number, sourceKey?: string): string => {
   const label = EVENT_SOURCE_LABELS[sourceId as EventSources];
   return label ?? sourceKey ?? `#${sourceId}`;
@@ -109,11 +98,11 @@ export const fetchSourceStatuses = async (): Promise<SourceStatus[]> => {
     throw new Error(`Failed to fetch source statuses: ${response.status}`);
   }
   const payload = schemaSourcesResponse.parse(await response.json());
-  const generatedAtMs = parseDateMs(payload.generatedAt) ?? Date.now();
+  const generatedAtMs = Date.parse(payload.generatedAt);
   const mapped: SourceStatus[] = [];
   for (let i = 0; i < payload.sources.length; i += 1) {
     const source = payload.sources[i];
-    const lastSuccessMs = parseDateMs(source.lastSuccessAt);
+    const lastSuccessMs = source.lastSuccessAt ? Date.parse(source.lastSuccessAt) : null;
     const staleThresholdMs = source.staleAfterSec * 1000;
     const isStale = lastSuccessMs ? generatedAtMs - lastSuccessMs > staleThresholdMs : false;
     const isConnected = source.status === 'ok' && !!lastSuccessMs && !isStale;
@@ -182,10 +171,10 @@ export const parseEventData = (raw: string): ApiEvent | null => {
   return result.data;
 };
 
-export const toDisasterEvent = (event: ApiEvent, isRealtime = false): DisasterEvent => {
-  const occurredAtMs = parseDateMs(event.occurredAt);
-  const fetchedAtMs = parseDateMs(event.fetchedAt);
-  const timestamp = occurredAtMs ?? fetchedAtMs ?? Date.now();
+export const toDisasterEvent = (event: ApiEvent, receivedAtMs: number): DisasterEvent => {
+  const occurredAtMs = event.occurredAt ? Date.parse(event.occurredAt) : null;
+  const fetchedAtMs = Date.parse(event.fetchedAt);
+  const timestamp = occurredAtMs ?? fetchedAtMs;
   return {
     id: event.id,
     sourceId: event.source,
@@ -196,13 +185,8 @@ export const toDisasterEvent = (event: ApiEvent, isRealtime = false): DisasterEv
     content: event.body ?? undefined,
     level: event.level,
     timestamp,
-    fetchedAt: event.fetchedAt,
-    occurredAt: event.occurredAt,
-    regionText: event.regionText,
+    receivedAtMs,
     geo: event.geo ?? null,
     regionCodes: event.regionCodes ?? null,
-    isRealtime,
   };
 };
-
-export const getFetchedAtMs = (event: ApiEvent): number | null => parseDateMs(event.fetchedAt);

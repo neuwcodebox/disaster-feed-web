@@ -91,12 +91,9 @@ export interface DisasterEvent {
   content?: string;
   level: EventLevels;
   timestamp: number;
-  fetchedAt: string;
-  occurredAt: string | null;
-  regionText: string | null;
+  receivedAtMs: number;
   geo: EventGeo | null;
   regionCodes: string[] | null;
-  isRealtime: boolean;
 }
 
 export type EventMetric = {

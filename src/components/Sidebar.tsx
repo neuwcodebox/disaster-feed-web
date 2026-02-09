@@ -3,6 +3,7 @@ import { ko } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ShieldAlert } from 'lucide-react';
 import type React from 'react';
+import { REALTIME_EVENT_WINDOW_MS } from '../config/appRuntime';
 import { getEventKindIcon, LEVEL_CONFIG } from '../constants';
 import { type DisasterEvent, EventLevels } from '../types';
 import EventSourceLink from './EventSourceLink';
@@ -20,6 +21,8 @@ const formatRelativeTime = (timestamp: number) =>
 const highlightTransition = { duration: 3.5, ease: 'easeOut' } as const;
 
 const Sidebar: React.FC<SidebarProps> = ({ events }) => {
+  const nowMs = Date.now();
+
   return (
     <aside className="w-full lg:w-96 bg-slate-900/50 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col shrink-0">
       <div className="p-3 md:p-5 bg-slate-800/80 flex items-center justify-between border-b border-slate-700">
@@ -48,65 +51,72 @@ const Sidebar: React.FC<SidebarProps> = ({ events }) => {
                 현재 표시할 주요 재난 현황이 없습니다.
               </motion.div>
             ) : (
-              events.map((event) => (
-                <motion.div
-                  key={event.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className={`select-text shrink-0 w-64 lg:w-full p-3 md:p-4 rounded-xl border-l-4 md:border-l-8 ${LEVEL_CONFIG[event.level].border} bg-slate-800 shadow-lg relative overflow-hidden`}
-                >
-                  {event.isRealtime && (
-                    <motion.div
-                      aria-hidden="true"
-                      className={`absolute inset-0 ${LEVEL_CONFIG[event.level].bg} pointer-events-none`}
-                      initial={{ opacity: 0.35 }}
-                      animate={{ opacity: 0 }}
-                      transition={highlightTransition}
-                    />
-                  )}
-                  <div className="flex justify-between items-start gap-2 mb-1.5 md:mb-2">
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[8px] md:text-[10px] font-bold ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}
-                    >
-                      {LEVEL_CONFIG[event.level].label}
-                    </span>
-                    <div className="flex items-center gap-1 text-[8px] md:text-[10px] font-semibold text-slate-400">
-                      <span>{event.category}</span>
-                      <span>·</span>
-                      <span>{formatRelativeTime(event.timestamp)}</span>
-                      <span>·</span>
-                      <EventSourceLink
-                        sourceId={event.sourceId}
-                        label={event.source}
-                        className="text-slate-400 hover:text-slate-200 transition"
-                        decorationClassName="decoration-slate-400/50 hover:decoration-slate-300/70"
-                      />
-                    </div>
-                  </div>
-
-                  <h3
-                    className={`font-bold text-xs md:text-sm text-slate-100 leading-snug whitespace-pre-line break-all flex items-center gap-1 ${
-                      event.content ? 'mb-1.5 md:mb-2' : 'mb-0'
-                    }`}
+              events.map((event) => {
+                const shouldHighlight = nowMs - event.receivedAtMs <= REALTIME_EVENT_WINDOW_MS;
+                return (
+                  <motion.div
+                    key={event.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className={`select-text shrink-0 w-64 lg:w-full p-3 md:p-4 rounded-xl border-l-4 md:border-l-8 ${LEVEL_CONFIG[event.level].border} bg-slate-800 shadow-lg relative overflow-hidden`}
                   >
-                    <span className="text-[12px] md:text-[14px] leading-none" title={event.category} aria-hidden="true">
-                      {getEventKindIcon(event.kind)}
-                    </span>
-                    <span className="min-w-0">{event.title}</span>
-                  </h3>
-                  {event.content && (
-                    <p className="text-[11px] md:text-[12px] text-slate-300 leading-snug whitespace-pre-line wrap-break-words">
-                      {event.content}
-                    </p>
-                  )}
+                    {shouldHighlight && (
+                      <motion.div
+                        aria-hidden="true"
+                        className={`absolute inset-0 ${LEVEL_CONFIG[event.level].bg} pointer-events-none`}
+                        initial={{ opacity: 0.35 }}
+                        animate={{ opacity: 0 }}
+                        transition={highlightTransition}
+                      />
+                    )}
+                    <div className="flex justify-between items-start gap-2 mb-1.5 md:mb-2">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[8px] md:text-[10px] font-bold ${LEVEL_CONFIG[event.level].bg} ${LEVEL_CONFIG[event.level].text}`}
+                      >
+                        {LEVEL_CONFIG[event.level].label}
+                      </span>
+                      <div className="flex items-center gap-1 text-[8px] md:text-[10px] font-semibold text-slate-400">
+                        <span>{event.category}</span>
+                        <span>·</span>
+                        <span>{formatRelativeTime(event.timestamp)}</span>
+                        <span>·</span>
+                        <EventSourceLink
+                          sourceId={event.sourceId}
+                          label={event.source}
+                          className="text-slate-400 hover:text-slate-200 transition"
+                          decorationClassName="decoration-slate-400/50 hover:decoration-slate-300/70"
+                        />
+                      </div>
+                    </div>
 
-                  {event.level === EventLevels.Critical && (
-                    <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 bg-red-600/10 rounded-full -mr-6 -mt-6 animate-pulse" />
-                  )}
-                </motion.div>
-              ))
+                    <h3
+                      className={`font-bold text-xs md:text-sm text-slate-100 leading-snug whitespace-pre-line break-all flex items-center gap-1 ${
+                        event.content ? 'mb-1.5 md:mb-2' : 'mb-0'
+                      }`}
+                    >
+                      <span
+                        className="text-[12px] md:text-[14px] leading-none"
+                        title={event.category}
+                        aria-hidden="true"
+                      >
+                        {getEventKindIcon(event.kind)}
+                      </span>
+                      <span className="min-w-0">{event.title}</span>
+                    </h3>
+                    {event.content && (
+                      <p className="text-[11px] md:text-[12px] text-slate-300 leading-snug whitespace-pre-line wrap-break-words">
+                        {event.content}
+                      </p>
+                    )}
+
+                    {event.level === EventLevels.Critical && (
+                      <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 bg-red-600/10 rounded-full -mr-6 -mt-6 animate-pulse" />
+                    )}
+                  </motion.div>
+                );
+              })
             )}
           </AnimatePresence>
         </div>

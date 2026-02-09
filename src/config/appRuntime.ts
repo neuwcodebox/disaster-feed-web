@@ -7,3 +7,4 @@ export const MAP_LARGE_SCREEN_QUERY = '(min-width: 1536px)';
 export const ALERT_SOUND_LEVELS: EventLevels[] = [EventLevels.Moderate, EventLevels.Severe, EventLevels.Critical];
 export const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000;
 export const SIDEBAR_EVENT_LIMIT = 30;
+export const REALTIME_EVENT_WINDOW_MS = 5000;

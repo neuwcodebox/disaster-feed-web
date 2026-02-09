@@ -3,6 +3,7 @@ import { ko } from 'date-fns/locale';
 import { motion } from 'framer-motion';
 import type React from 'react';
 import { useState } from 'react';
+import { REALTIME_EVENT_WINDOW_MS } from '../config/appRuntime';
 import { LEVEL_CONFIG } from '../constants';
 import type { DisasterEvent } from '../types';
 import EventSourceLink from './EventSourceLink';
@@ -24,6 +25,7 @@ const CategoryEventCard = ({ event, isPrimary }: CategoryEventCardProps) => {
   const [isExpandedByUser, setIsExpandedByUser] = useState(false);
   const isExpandable = !isPrimary && Boolean(event.content);
   const isExpanded = isPrimary || isExpandedByUser;
+  const shouldHighlight = Date.now() - event.receivedAtMs <= REALTIME_EVENT_WINDOW_MS;
 
   const handleToggle = () => {
     const selection = window.getSelection();
@@ -62,7 +64,7 @@ const CategoryEventCard = ({ event, isPrimary }: CategoryEventCardProps) => {
       tabIndex={isExpandable ? 0 : undefined}
       onKeyDown={handleKeyDown}
     >
-      {event.isRealtime && (
+      {shouldHighlight && (
         <motion.div
           aria-hidden="true"
           className={`absolute inset-0 ${LEVEL_CONFIG[event.level].bg} pointer-events-none`}

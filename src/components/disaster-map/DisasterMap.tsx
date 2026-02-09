@@ -6,6 +6,7 @@ import maplibregl from 'maplibre-gl';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { REALTIME_EVENT_WINDOW_MS } from '../../config/appRuntime';
 import { type DisasterEvent, type EventGeo, EventLevels } from '../../types';
 import { filterEventsByAge } from '../../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
@@ -376,7 +377,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       if (knownEventIdsRef.current.has(event.id)) {
         continue;
       }
-      if (!event.isRealtime) {
+      if (now - event.receivedAtMs > REALTIME_EVENT_WINDOW_MS) {
         continue;
       }
       if (event.timestamp < threshold) {
