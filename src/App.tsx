@@ -8,11 +8,11 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import UpdateNotifier from './components/UpdateNotifier';
 import { MAP_LARGE_SCREEN_QUERY, MAX_EVENT_AGE_MS, SIDEBAR_EVENT_LIMIT } from './config/appRuntime';
-import { SIDEBAR_MIN_LEVEL } from './constants';
+import { CATEGORY_GRID_MIN_LEVEL_BY_SOURCE, SIDEBAR_MIN_LEVEL } from './constants';
 import { useAlertSound } from './hooks/useAlertSound';
 import { useDisasterStream } from './hooks/useDisasterStream';
 import { useExpiryClock } from './hooks/useExpiryClock';
-import type { CategoryGroup, CategorySortMode, DisasterEvent, EventMetric } from './types';
+import type { CategoryGroup, CategorySortMode, DisasterEvent, EventMetric, EventSources } from './types';
 import { filterEventsByAge, filterMetricsByAge } from './utils/eventFilters';
 import { compareEventsByOccurrence, compareEventsByScoreStatic } from './utils/eventProcessing';
 
@@ -63,6 +63,11 @@ const buildCategoryGroups = (items: DisasterEvent[], sortMode: CategorySortMode)
   const grouped = new Map<string, DisasterEvent[]>();
   for (let i = 0; i < items.length; i += 1) {
     const event = items[i];
+    const minLevel = CATEGORY_GRID_MIN_LEVEL_BY_SOURCE[event.sourceId as EventSources];
+    if (minLevel !== undefined && event.level < minLevel) {
+      continue;
+    }
+
     const existing = grouped.get(event.category);
     if (existing) {
       existing.push(event);

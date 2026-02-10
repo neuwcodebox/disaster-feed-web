@@ -246,3 +246,8 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
 
 export const CATEGORY_PAGE_SIZE = 6;
 export const SIDEBAR_MIN_LEVEL = EventLevels.Moderate;
+
+export const CATEGORY_GRID_MIN_LEVEL_BY_SOURCE: Partial<Record<EventSources, EventLevels>> = {
+  [EventSources.NfdsFireDispatch]: EventLevels.Minor,
+  [EventSources.UticTrafficIncident]: EventLevels.Minor,
+};
