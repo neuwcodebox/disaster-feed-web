@@ -74,6 +74,7 @@ const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
 };
 const WINDOW_STEP_MS = 15 * 60 * 1000;
 const WINDOW_REFRESH_INTERVAL_MS = 60000;
+const DEFAULT_MIN_DISPLAY_LEVEL = EventLevels.Info;
 const NATIONWIDE_REQUIRED_CODES = new Set<string>([
   '1100000000',
   '2600000000',
@@ -147,6 +148,8 @@ const isNationwideLowLevelEvent = (event: DisasterEvent): boolean => {
 };
 
 const isGeoEvent = (event: DisasterEvent): event is GeoEvent => Boolean(event.geo);
+
+const getInitialWindowAgeMs = (maxEventAgeMs: number): number => Math.round(maxEventAgeMs / 4);
 
 const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseRegion[] => {
   if (incoming.length === 0) {
@@ -248,9 +251,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const hasSeededEventsRef = useRef(false);
   const pointEmojiLabelsRef = useRef<EmojiLabel[]>([]);
   const regionEmojiLabelsRef = useRef<EmojiLabel[]>([]);
-  const [windowAgeMs, setWindowAgeMs] = useState(Math.round(maxEventAgeMs / 4));
+  const [windowAgeMs, setWindowAgeMs] = useState(() => getInitialWindowAgeMs(maxEventAgeMs));
   const [windowNowMs, setWindowNowMs] = useState(() => Date.now());
-  const [minDisplayLevel, setMinDisplayLevel] = useState<EventLevels>(EventLevels.Info);
+  const [minDisplayLevel, setMinDisplayLevel] = useState<EventLevels>(DEFAULT_MIN_DISPLAY_LEVEL);
 
   const sliderStepMs = Math.min(WINDOW_STEP_MS, maxEventAgeMs);
   const sliderMinMs = sliderStepMs;
@@ -680,11 +683,12 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
 
   const handleResetView = useCallback(() => {
     const map = mapRef.current;
-    if (!map) {
-      return;
+    if (map) {
+      map.easeTo({ ...MAP_DEFAULT_VIEW, duration: 700 });
     }
-    map.easeTo({ ...MAP_DEFAULT_VIEW, duration: 700 });
-  }, []);
+    setWindowAgeMs(getInitialWindowAgeMs(maxEventAgeMs));
+    setMinDisplayLevel(DEFAULT_MIN_DISPLAY_LEVEL);
+  }, [maxEventAgeMs]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
