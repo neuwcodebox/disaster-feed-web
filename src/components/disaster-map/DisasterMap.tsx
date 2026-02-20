@@ -10,6 +10,7 @@ import { REALTIME_EVENT_WINDOW_MS } from '../../config/appRuntime';
 import { type DisasterEvent, type EventGeo, EventLevels } from '../../types';
 import { filterEventsByAge } from '../../utils/eventFilters';
 import CapitalInsetMap from './CapitalInsetMap';
+import DisasterMapControlPanel from './DisasterMapControlPanel';
 import DisasterMapEmojiMarkers, {
   buildRegionCentroids,
   buildRegionEmojiLabels,
@@ -249,6 +250,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const regionEmojiLabelsRef = useRef<EmojiLabel[]>([]);
   const [windowAgeMs, setWindowAgeMs] = useState(Math.round(maxEventAgeMs / 4));
   const [windowNowMs, setWindowNowMs] = useState(() => Date.now());
+  const [minDisplayLevel, setMinDisplayLevel] = useState<EventLevels>(EventLevels.Info);
 
   const sliderStepMs = Math.min(WINDOW_STEP_MS, maxEventAgeMs);
   const sliderMinMs = sliderStepMs;
@@ -271,12 +273,16 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     const filtered: DisasterEvent[] = [];
     for (let i = 0; i < filteredByAge.length; i += 1) {
       const event = filteredByAge[i];
-      if (!isNationwideLowLevelEvent(event)) {
-        filtered.push(event);
+      if (event.level < minDisplayLevel) {
+        continue;
       }
+      if (isNationwideLowLevelEvent(event)) {
+        continue;
+      }
+      filtered.push(event);
     }
     return filtered;
-  }, [events, windowAgeMs, windowNowMs]);
+  }, [events, minDisplayLevel, windowAgeMs, windowNowMs]);
   const regionLevels = useMemo(() => collectRegionLevels(mapEvents), [mapEvents]);
   const pointEvents = useMemo(() => collectGeoEvents(mapEvents), [mapEvents]);
   const regionIndex = useMemo<GeoRegionIndex | null>(() => {
@@ -383,6 +389,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       if (event.timestamp < threshold) {
         continue;
       }
+      if (event.level < minDisplayLevel) {
+        continue;
+      }
       if (isNationwideLowLevelEvent(event)) {
         continue;
       }
@@ -439,7 +448,30 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     if (hasPointPulses || hasRegionPulses) {
       setPulseNow(now);
     }
-  }, [events, windowAgeMs]);
+  }, [events, minDisplayLevel, windowAgeMs]);
+
+  useEffect(() => {
+    setPulsePoints((prev) => {
+      const next: PulsePoint[] = [];
+      for (let i = 0; i < prev.length; i += 1) {
+        const pulse = prev[i];
+        if (pulse.level >= minDisplayLevel) {
+          next.push(pulse);
+        }
+      }
+      return next;
+    });
+    setPulseRegions((prev) => {
+      const next: PulseRegion[] = [];
+      for (let i = 0; i < prev.length; i += 1) {
+        const pulse = prev[i];
+        if (pulse.level >= minDisplayLevel) {
+          next.push(pulse);
+        }
+      }
+      return next;
+    });
+  }, [minDisplayLevel]);
 
   useEffect(() => {
     if (pulsePoints.length === 0 && pulseRegions.length === 0) {
@@ -831,38 +863,20 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           <DisasterMapEmojiMarkers markers={pointEmojiMarkers} variant="point" />
         </div>
         <EmojiMarkerPopup container={containerRef.current} marker={selectedEmojiMarker} label={selectedEmojiLabel} />
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 sm:inset-x-5 sm:bottom-5">
-          <div className="pointer-events-auto flex flex-col gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/85 p-3 shadow-[0_16px_36px_rgba(2,6,23,0.55)] backdrop-blur md:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs md:text-sm">
-              <div className="flex items-center gap-2 font-semibold text-slate-200">최근 {windowLabel}</div>
-              <button
-                type="button"
-                onClick={() => setWindowAgeMs(maxEventAgeMs)}
-                disabled={windowAgeMs >= maxEventAgeMs}
-                className="rounded-full border border-slate-700/80 px-2 py-1 text-[10px] md:text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white disabled:cursor-default disabled:border-slate-800 disabled:text-slate-600"
-              >
-                전체 보기
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] md:text-xs text-slate-500 whitespace-nowrap">{minWindowLabel}</span>
-              <input
-                id="map-time-window"
-                type="range"
-                min={sliderMinMs}
-                max={maxEventAgeMs}
-                step={sliderStepMs}
-                value={windowAgeMs}
-                onChange={(event) => {
-                  setWindowAgeMs(Number(event.target.value));
-                }}
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-linear-to-r from-slate-700 via-slate-600 to-blue-500 accent-blue-400"
-                aria-label="지도 표시 시간 범위"
-              />
-              <span className="text-[10px] md:text-xs text-slate-500 whitespace-nowrap">{maxWindowLabel}</span>
-            </div>
-          </div>
-        </div>
+        <DisasterMapControlPanel
+          isOpen={isOpen}
+          isLargeScreen={isLargeScreen}
+          minDisplayLevel={minDisplayLevel}
+          onMinDisplayLevelChange={setMinDisplayLevel}
+          windowAgeMs={windowAgeMs}
+          onWindowAgeMsChange={setWindowAgeMs}
+          sliderMinMs={sliderMinMs}
+          sliderStepMs={sliderStepMs}
+          maxEventAgeMs={maxEventAgeMs}
+          windowLabel={windowLabel}
+          minWindowLabel={minWindowLabel}
+          maxWindowLabel={maxWindowLabel}
+        />
       </div>
     </section>
   );
