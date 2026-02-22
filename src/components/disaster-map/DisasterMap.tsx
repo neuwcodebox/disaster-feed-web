@@ -57,7 +57,7 @@ type PulseRegionLookup = {
 };
 
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const MAP_CENTER: [number, number] = [127.7, 36.4];
+const MAP_CENTER: [number, number] = [127.7, 36.5];
 const MAP_DEFAULT_VIEW = {
   center: MAP_CENTER,
   zoom: 6,
