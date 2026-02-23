@@ -47,6 +47,7 @@ export enum EventKinds {
   WildAnimal = 38,
   Cyber = 39,
   SpaceWeather = 40,
+  MarineAccident = 41,
 }
 
 export enum EventSources {
