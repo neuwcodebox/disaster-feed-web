@@ -81,6 +81,7 @@ export const EVENT_KIND_LABELS: Record<EventKinds, string> = {
   [EventKinds.Cyber]: '사이버',
   [EventKinds.SpaceWeather]: '우주환경',
   [EventKinds.MarineAccident]: '해양사고',
+  [EventKinds.AviationAccident]: '항공사고',
 };
 
 export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
@@ -125,6 +126,7 @@ export const EVENT_KIND_ICONS: Record<EventKinds, string> = {
   [EventKinds.Cyber]: '🌐',
   [EventKinds.SpaceWeather]: '🛰️',
   [EventKinds.MarineAccident]: '🚢',
+  [EventKinds.AviationAccident]: '✈️',
 };
 
 export const getEventKindIcon = (kind: number): string => EVENT_KIND_ICONS[kind as EventKinds] ?? '?';
