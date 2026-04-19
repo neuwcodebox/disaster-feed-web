@@ -190,7 +190,7 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
 };
 
 export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
-  [EventSources.SafekoreaSms]: 'https://www.safekorea.go.kr/idsiSFK/neo/sfk/cs/sfc/dis/disasterMsgList.jsp?menuSeq=679',
+  [EventSources.SafekoreaSms]: 'https://safekorea.go.kr/safekorea-kor/ctim/cmsg/calamitySms.do?menuSn=34&firstYn=Y',
   [EventSources.MoisPressRelease]:
     'https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardList.do?bbsId=BBSMSTR_000000000008',
   [EventSources.MsitPressRelease]: 'https://www.msit.go.kr/bbs/list.do?sCode=user&mPid=208&mId=307',
@@ -204,7 +204,7 @@ export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
   [EventSources.UticTrafficIncident]: 'https://www.utic.go.kr/map/map.do?menu=incident',
   [EventSources.AirkoreaPmWarning]: 'https://www.airkorea.or.kr/web/pmWarning?pMENU_NO=115',
   [EventSources.AirkoreaO3Warning]: 'https://www.airkorea.or.kr/web/o3Warning?pMENU_NO=116',
-  [EventSources.FloodAlert]: 'https://m.flood.go.kr/floodList.do',
+  [EventSources.FloodAlert]: 'https://m.flood.go.kr:9987/floodList.do',
   [EventSources.ForestFireInfo]: 'https://fd.forest.go.kr/ffas/',
   [EventSources.ForestFireWarning]: 'https://fd.forest.go.kr/ffas/',
   [EventSources.LandslideForecast]: 'https://sansatai.forest.go.kr/',
