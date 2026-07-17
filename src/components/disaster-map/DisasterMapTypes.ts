@@ -7,6 +7,8 @@ export type RegionLevels = {
 
 export type GeoRegionProperties = {
   SIG_CD: string;
+  SIG_KOR_NM?: string;
+  sido?: string;
 };
 
 export type GeoRegionPolygonGeometry = {
@@ -35,6 +37,15 @@ export type GeoRegionFeatureCollection = {
 export type GeoRegionIndex = {
   byCode: Map<string, GeoRegionFeature>;
   byPrefix: Map<string, GeoRegionFeature[]>;
+};
+
+export type GeoRegionSource = 'current' | 'legacy';
+
+export type ResolvedRegionMatch = {
+  code: string;
+  features: GeoRegionFeature[];
+  isWide: boolean;
+  source: GeoRegionSource;
 };
 
 export type EmojiLabel = {
@@ -68,4 +79,5 @@ export type PulseRegion = {
   level: EventLevels;
   startedAt: number;
   isWide: boolean;
+  source: GeoRegionSource;
 };

@@ -26,17 +26,22 @@ import {
   PULSE_DURATION_MS,
   REGION_PULSE_DURATION_MS,
 } from './DisasterMapPulse';
-import { normalizeRegionCode, resolveRegionPrefix } from './DisasterMapRegionCodes';
+import { buildGeoRegionIndex, isNationwideRegionCodes, resolveRegionMatch } from './DisasterMapRegionCodes';
+import {
+  buildMatchedRegionIndex,
+  buildRegionEmojiEvents,
+  collectPulseRegionFeatures,
+  collectRegionEventMatches,
+  collectRegionLevels,
+} from './DisasterMapRegions';
 import type {
   EmojiLabel,
   EmojiMarker,
   GeoRegionFeature,
   GeoRegionFeatureCollection,
-  GeoRegionIndex,
   GeoRegionProperties,
   PulsePoint,
   PulseRegion,
-  RegionLevels,
 } from './DisasterMapTypes';
 import EmojiMarkerPopup from './EmojiMarkerPopup';
 import { useEmojiMarkerSelection } from './useEmojiMarkerSelection';
@@ -75,25 +80,6 @@ const EMPTY_GEOJSON: GeoRegionFeatureCollection = {
 const WINDOW_STEP_MS = 15 * 60 * 1000;
 const WINDOW_REFRESH_INTERVAL_MS = 60000;
 const DEFAULT_MIN_DISPLAY_LEVEL = EventLevels.Info;
-const NATIONWIDE_REQUIRED_CODES = new Set<string>([
-  '1100000000',
-  '2600000000',
-  '2700000000',
-  '2800000000',
-  '2900000000',
-  '3000000000',
-  '3100000000',
-  '3611000000',
-  '4100000000',
-  '4300000000',
-  '4400000000',
-  '4600000000',
-  '4700000000',
-  '4800000000',
-  '5100000000',
-  '5200000000',
-]);
-
 const formatWindowLabel = (durationMs: number): string => {
   const totalMinutes = Math.max(1, Math.round(durationMs / 60000));
   if (totalMinutes < 60) {
@@ -113,28 +99,6 @@ const formatWindowLabel = (durationMs: number): string => {
     return `${totalDays}일`;
   }
   return `${totalDays}일 ${remainingHours}시간`;
-};
-
-const isNationwideRegionCodes = (regionCodes: string[] | null): boolean => {
-  if (!regionCodes || regionCodes.length === 0) {
-    return false;
-  }
-  const normalizedCodes = new Set<string>();
-  for (let i = 0; i < regionCodes.length; i += 1) {
-    const normalized = normalizeRegionCode(regionCodes[i]);
-    if (normalized) {
-      normalizedCodes.add(normalized);
-    }
-  }
-  if (normalizedCodes.size === 0) {
-    return false;
-  }
-  for (const requiredCode of NATIONWIDE_REQUIRED_CODES) {
-    if (!normalizedCodes.has(requiredCode)) {
-      return false;
-    }
-  }
-  return true;
 };
 
 const isNationwideLowLevelEvent = (event: DisasterEvent): boolean => {
@@ -158,12 +122,12 @@ const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseR
   const merged = new Map<string, PulseRegion>();
   for (let i = 0; i < prev.length; i += 1) {
     const pulse = prev[i];
-    const key = `${pulse.isWide ? '2' : '5'}-${pulse.code}`;
+    const key = `${pulse.source}-${pulse.isWide ? '2' : '5'}-${pulse.code}`;
     merged.set(key, pulse);
   }
   for (let i = 0; i < incoming.length; i += 1) {
     const pulse = incoming[i];
-    const key = `${pulse.isWide ? '2' : '5'}-${pulse.code}`;
+    const key = `${pulse.source}-${pulse.isWide ? '2' : '5'}-${pulse.code}`;
     const existing = merged.get(key);
     if (!existing) {
       merged.set(key, pulse);
@@ -184,46 +148,6 @@ const mergePulseRegions = (prev: PulseRegion[], incoming: PulseRegion[]): PulseR
   return combined.slice(combined.length - REGION_PULSE_MAX_AREAS);
 };
 
-const collectRegionLevels = (events: DisasterEvent[]): RegionLevels => {
-  const codes2 = new Map<string, EventLevels>();
-  const codes5 = new Map<string, EventLevels>();
-  for (let i = 0; i < events.length; i += 1) {
-    const event = events[i];
-
-    if (event.geo) {
-      continue;
-    }
-
-    const level = event.level;
-    const regionCodes = event.regionCodes;
-
-    if (!regionCodes) {
-      continue;
-    }
-
-    for (let j = 0; j < regionCodes.length; j += 1) {
-      const normalized = normalizeRegionCode(regionCodes[j]);
-      if (!normalized) {
-        continue;
-      }
-
-      const prefix = resolveRegionPrefix(normalized);
-      if (prefix.length === 2) {
-        const existing = codes2.get(prefix);
-        if (!existing || level > existing) {
-          codes2.set(prefix, level);
-        }
-      } else {
-        const existing = codes5.get(prefix);
-        if (!existing || level > existing) {
-          codes5.set(prefix, level);
-        }
-      }
-    }
-  }
-  return { codes2, codes5 };
-};
-
 const collectGeoEvents = (events: DisasterEvent[]): GeoEvent[] => {
   const points: GeoEvent[] = [];
   for (let i = 0; i < events.length; i += 1) {
@@ -241,7 +165,8 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
-  const [regionData, setRegionData] = useState<GeoRegionFeatureCollection | null>(null);
+  const [currentRegionData, setCurrentRegionData] = useState<GeoRegionFeatureCollection | null>(null);
+  const [legacyRegionData, setLegacyRegionData] = useState<GeoRegionFeatureCollection | null>(null);
   const [pulsePoints, setPulsePoints] = useState<PulsePoint[]>([]);
   const [pulseRegions, setPulseRegions] = useState<PulseRegion[]>([]);
   const [pulseNow, setPulseNow] = useState(0);
@@ -286,33 +211,31 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     }
     return filtered;
   }, [events, minDisplayLevel, windowAgeMs, windowNowMs]);
-  const regionLevels = useMemo(() => collectRegionLevels(mapEvents), [mapEvents]);
+  const currentRegionIndex = useMemo(
+    () => (currentRegionData ? buildGeoRegionIndex(currentRegionData) : null),
+    [currentRegionData],
+  );
+  const legacyRegionIndex = useMemo(
+    () => (legacyRegionData ? buildGeoRegionIndex(legacyRegionData) : null),
+    [legacyRegionData],
+  );
+  const regionIndex = currentRegionIndex ?? legacyRegionIndex;
+  const regionEventMatches = useMemo(
+    () => collectRegionEventMatches(mapEvents, currentRegionIndex, legacyRegionIndex),
+    [currentRegionIndex, legacyRegionIndex, mapEvents],
+  );
+  const regionLevels = useMemo(() => collectRegionLevels(regionEventMatches), [regionEventMatches]);
+  const capitalRegionLevels = useMemo(
+    () => ({ codes2: new Map<string, EventLevels>(), codes5: regionLevels.current }),
+    [regionLevels.current],
+  );
   const pointEvents = useMemo(() => collectGeoEvents(mapEvents), [mapEvents]);
-  const regionIndex = useMemo<GeoRegionIndex | null>(() => {
-    if (!regionData) {
-      return null;
-    }
-    const byCode = new Map<string, GeoRegionFeature>();
-    const byPrefix = new Map<string, GeoRegionFeature[]>();
-    const features = regionData.features;
-    for (let i = 0; i < features.length; i += 1) {
-      const feature = features[i];
-      const code = feature.properties.SIG_CD;
-      byCode.set(code, feature);
-      const prefix = code.slice(0, 2);
-      const list = byPrefix.get(prefix);
-      if (list) {
-        list.push(feature);
-      } else {
-        byPrefix.set(prefix, [feature]);
-      }
-    }
-    return { byCode, byPrefix };
-  }, [regionData]);
-  const regionCentroids = useMemo(() => buildRegionCentroids(regionIndex), [regionIndex]);
+  const matchedRegionIndex = useMemo(() => buildMatchedRegionIndex(regionEventMatches), [regionEventMatches]);
+  const regionCentroids = useMemo(() => buildRegionCentroids(matchedRegionIndex), [matchedRegionIndex]);
+  const regionEmojiEvents = useMemo(() => buildRegionEmojiEvents(regionEventMatches), [regionEventMatches]);
   const regionEmojiLabels = useMemo(
-    () => buildRegionEmojiLabels(mapEvents, regionCentroids),
-    [mapEvents, regionCentroids],
+    () => buildRegionEmojiLabels(regionEmojiEvents, regionCentroids),
+    [regionCentroids, regionEmojiEvents],
   );
   const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(mapEvents), [mapEvents]);
   const { selectedMarker: selectedEmojiMarker, selectedLabel: selectedEmojiLabel } = useEmojiMarkerSelection({
@@ -328,50 +251,22 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     for (let i = 0; i < pulseRegions.length; i += 1) {
       const pulse = pulseRegions[i];
       if (pulse.isWide) {
-        codes2.set(pulse.code, pulse);
+        codes2.set(`${pulse.source}:${pulse.code}`, pulse);
       } else {
-        codes5.set(pulse.code, pulse);
+        codes5.set(`${pulse.source}:${pulse.code}`, pulse);
       }
     }
     return { codes2, codes5 };
   }, [pulseRegions]);
 
-  const pulseRegionFeatures = useMemo<GeoRegionFeature[]>(() => {
-    if (!regionIndex || pulseRegions.length === 0) {
-      return [];
-    }
-    const features: GeoRegionFeature[] = [];
-    const seen = new Set<string>();
-    for (let i = 0; i < pulseRegions.length; i += 1) {
-      const pulse = pulseRegions[i];
-      if (pulse.isWide) {
-        const list = regionIndex.byPrefix.get(pulse.code);
-        if (!list) {
-          continue;
-        }
-        for (let j = 0; j < list.length; j += 1) {
-          const feature = list[j];
-          const code = feature.properties.SIG_CD;
-          if (seen.has(code)) {
-            continue;
-          }
-          seen.add(code);
-          features.push(feature);
-        }
-      } else {
-        const feature = regionIndex.byCode.get(pulse.code);
-        if (!feature) {
-          continue;
-        }
-        const code = feature.properties.SIG_CD;
-        if (!seen.has(code)) {
-          seen.add(code);
-          features.push(feature);
-        }
-      }
-    }
-    return features;
-  }, [pulseRegions, regionIndex]);
+  const currentPulseRegionFeatures = useMemo(
+    () => collectPulseRegionFeatures(pulseRegions, currentRegionIndex, 'current'),
+    [currentRegionIndex, pulseRegions],
+  );
+  const legacyPulseRegionFeatures = useMemo(
+    () => collectPulseRegionFeatures(pulseRegions, legacyRegionIndex, 'legacy'),
+    [legacyRegionIndex, pulseRegions],
+  );
 
   useEffect(() => {
     const nextIds = new Set<string>();
@@ -407,17 +302,23 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
           startedAt: now,
         });
       } else if (event.regionCodes) {
+        const seenMatches = new Set<string>();
         for (let j = 0; j < event.regionCodes.length; j += 1) {
-          const normalized = normalizeRegionCode(event.regionCodes[j]);
-          if (!normalized) {
+          const match = resolveRegionMatch(event.regionCodes[j], currentRegionIndex, legacyRegionIndex);
+          if (!match) {
             continue;
           }
-          const prefix = resolveRegionPrefix(normalized);
+          const key = `${match.source}:${match.code}`;
+          if (seenMatches.has(key)) {
+            continue;
+          }
+          seenMatches.add(key);
           nextRegionPulses.push({
-            code: prefix,
+            code: match.code,
             level: event.level,
             startedAt: now,
-            isWide: prefix.length === 2,
+            isWide: match.isWide,
+            source: match.source,
           });
         }
       }
@@ -451,7 +352,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     if (hasPointPulses || hasRegionPulses) {
       setPulseNow(now);
     }
-  }, [events, minDisplayLevel, windowAgeMs]);
+  }, [currentRegionIndex, events, legacyRegionIndex, minDisplayLevel, windowAgeMs]);
 
   useEffect(() => {
     setPulsePoints((prev) => {
@@ -532,13 +433,20 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
 
     const loadRegions = async () => {
       try {
-        const response = await fetch('/regions/SIG.json');
-        if (!response.ok) {
-          throw new Error(`Failed to load regions: ${response.status}`);
+        const [currentResponse, legacyResponse] = await Promise.all([
+          fetch('/regions/SIG-20260701.json'),
+          fetch('/regions/SIG-legacy.json'),
+        ]);
+        if (!currentResponse.ok || !legacyResponse.ok) {
+          throw new Error(`Failed to load regions: ${currentResponse.status}/${legacyResponse.status}`);
         }
-        const payload = (await response.json()) as GeoRegionFeatureCollection;
+        const [currentPayload, legacyPayload] = (await Promise.all([
+          currentResponse.json(),
+          legacyResponse.json(),
+        ])) as [GeoRegionFeatureCollection, GeoRegionFeatureCollection];
         if (isActive) {
-          setRegionData(payload);
+          setCurrentRegionData(currentPayload);
+          setLegacyRegionData(legacyPayload);
         }
       } catch (error) {
         console.warn('행정 구역 GeoJSON 로딩에 실패했습니다.', error);
@@ -552,10 +460,24 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
     };
   }, []);
 
+  const legacyEventFeatures = useMemo(() => {
+    if (!legacyRegionData) {
+      return [];
+    }
+    const features: GeoRegionFeature[] = [];
+    for (let i = 0; i < legacyRegionData.features.length; i += 1) {
+      const feature = legacyRegionData.features[i];
+      if (regionLevels.legacy.has(feature.properties.SIG_CD)) {
+        features.push(feature);
+      }
+    }
+    return features;
+  }, [legacyRegionData, regionLevels.legacy]);
+
   const layers = useMemo(() => {
     const regionLayer = new GeoJsonLayer<GeoRegionProperties>({
       id: 'regions',
-      data: regionData ?? EMPTY_GEOJSON,
+      data: currentRegionData ?? EMPTY_GEOJSON,
       stroked: true,
       filled: true,
       lineWidthUnits: 'pixels',
@@ -564,12 +486,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       getLineColor: [110, 130, 150, 90],
       getFillColor: (feature) => {
         const code = feature.properties.SIG_CD;
-        const level5 = regionLevels.codes5.get(code);
-        const level2 = regionLevels.codes2.get(code.slice(0, 2));
-        let level = level5 ?? level2;
-        if (level5 !== undefined && level2 !== undefined) {
-          level = Math.max(level5, level2);
-        }
+        const level = regionLevels.current.get(code);
         if (level) {
           return getRegionFillColor(level);
         }
@@ -580,11 +497,34 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
       },
     });
 
-    const regionPulseLayer =
-      pulseRegionFeatures.length > 0
+    const legacyRegionLayer =
+      legacyEventFeatures.length > 0
         ? new GeoJsonLayer<GeoRegionProperties>({
-            id: 'region-pulse',
-            data: pulseRegionFeatures,
+            id: 'legacy-event-regions',
+            data: legacyEventFeatures,
+            stroked: true,
+            filled: true,
+            lineWidthUnits: 'pixels',
+            lineWidthMinPixels: 1,
+            getLineWidth: 1,
+            getLineColor: [110, 130, 150, 120],
+            getFillColor: (feature) => {
+              const level = regionLevels.legacy.get(feature.properties.SIG_CD);
+              return level ? getRegionFillColor(level) : [0, 0, 0, 0];
+            },
+            updateTriggers: { getFillColor: [regionLevels.legacy] },
+          })
+        : null;
+
+    const createRegionPulseLayer = (
+      id: string,
+      data: GeoRegionFeature[],
+      source: PulseRegion['source'],
+    ): GeoJsonLayer<GeoRegionProperties> | null =>
+      data.length > 0
+        ? new GeoJsonLayer<GeoRegionProperties>({
+            id,
+            data,
             stroked: true,
             filled: true,
             lineWidthUnits: 'pixels',
@@ -592,7 +532,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
             getLineWidth: REGION_PULSE_LINE_WIDTH,
             getLineColor: (feature) => {
               const code = feature.properties.SIG_CD;
-              const pulse = pulseRegionLookup.codes5.get(code) ?? pulseRegionLookup.codes2.get(code.slice(0, 2));
+              const pulse =
+                pulseRegionLookup.codes5.get(`${source}:${code}`) ??
+                pulseRegionLookup.codes2.get(`${source}:${code.slice(0, 2)}`);
               if (!pulse) {
                 return [0, 0, 0, 0];
               }
@@ -600,7 +542,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
             },
             getFillColor: (feature) => {
               const code = feature.properties.SIG_CD;
-              const pulse = pulseRegionLookup.codes5.get(code) ?? pulseRegionLookup.codes2.get(code.slice(0, 2));
+              const pulse =
+                pulseRegionLookup.codes5.get(`${source}:${code}`) ??
+                pulseRegionLookup.codes2.get(`${source}:${code.slice(0, 2)}`);
               if (!pulse) {
                 return [0, 0, 0, 0];
               }
@@ -612,6 +556,12 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
             },
           })
         : null;
+    const currentRegionPulseLayer = createRegionPulseLayer(
+      'current-region-pulse',
+      currentPulseRegionFeatures,
+      'current',
+    );
+    const legacyRegionPulseLayer = createRegionPulseLayer('legacy-region-pulse', legacyPulseRegionFeatures, 'legacy');
 
     const pointsLayer = new ScatterplotLayer<GeoEvent>({
       id: 'event-points',
@@ -648,8 +598,14 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         : null;
 
     const nextLayers: Layer[] = [regionLayer];
-    if (regionPulseLayer) {
-      nextLayers.push(regionPulseLayer);
+    if (legacyRegionLayer) {
+      nextLayers.push(legacyRegionLayer);
+    }
+    if (currentRegionPulseLayer) {
+      nextLayers.push(currentRegionPulseLayer);
+    }
+    if (legacyRegionPulseLayer) {
+      nextLayers.push(legacyRegionPulseLayer);
     }
     nextLayers.push(pointsLayer);
     if (pulseLayer) {
@@ -658,13 +614,15 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
 
     return nextLayers;
   }, [
+    currentPulseRegionFeatures,
+    currentRegionData,
+    legacyEventFeatures,
+    legacyPulseRegionFeatures,
     pointEvents,
     pulseNow,
     pulsePoints,
-    pulseRegionFeatures,
     pulseRegionLookup,
     pulseRegions,
-    regionData,
     regionLevels,
   ]);
 
@@ -854,7 +812,7 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
         <div ref={containerRef} className="absolute inset-0 h-full" />
         <CapitalInsetMap
           regionIndex={regionIndex}
-          regionLevels={regionLevels}
+          regionLevels={capitalRegionLevels}
           pointEmojiLabels={pointEmojiLabels}
           regionEmojiLabels={regionEmojiLabels}
           isLargeScreen={isLargeScreen}

@@ -17,7 +17,6 @@ const schemaEvent = z.object({
   body: z.string().optional(),
   fetchedAt: z.string(),
   occurredAt: z.string().nullable(),
-  regionText: z.string().optional(),
   geo: schemaGeo.optional(),
   regionCodes: z.array(z.string()).optional(),
   level: z.enum(EventLevels),
