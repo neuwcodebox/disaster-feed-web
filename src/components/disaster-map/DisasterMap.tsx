@@ -29,7 +29,6 @@ import {
 import { buildGeoRegionIndex, isNationwideRegionCodes, resolveRegionMatch } from './DisasterMapRegionCodes';
 import {
   buildMatchedRegionIndex,
-  buildRegionEmojiEvents,
   collectPulseRegionFeatures,
   collectRegionEventMatches,
   collectRegionLevels,
@@ -232,10 +231,9 @@ const DisasterMap: React.FC<DisasterMapProps> = ({ events, isOpen, isLargeScreen
   const pointEvents = useMemo(() => collectGeoEvents(mapEvents), [mapEvents]);
   const matchedRegionIndex = useMemo(() => buildMatchedRegionIndex(regionEventMatches), [regionEventMatches]);
   const regionCentroids = useMemo(() => buildRegionCentroids(matchedRegionIndex), [matchedRegionIndex]);
-  const regionEmojiEvents = useMemo(() => buildRegionEmojiEvents(regionEventMatches), [regionEventMatches]);
   const regionEmojiLabels = useMemo(
-    () => buildRegionEmojiLabels(regionEmojiEvents, regionCentroids),
-    [regionCentroids, regionEmojiEvents],
+    () => buildRegionEmojiLabels(regionEventMatches, regionCentroids),
+    [regionCentroids, regionEventMatches],
   );
   const pointEmojiLabels = useMemo(() => collectPointEmojiLabels(mapEvents), [mapEvents]);
   const { selectedMarker: selectedEmojiMarker, selectedLabel: selectedEmojiLabel } = useEmojiMarkerSelection({

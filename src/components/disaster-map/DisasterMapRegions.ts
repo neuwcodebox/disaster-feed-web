@@ -95,15 +95,6 @@ export const buildMatchedRegionIndex = (matches: RegionEventMatch[]): GeoRegionI
   return { byCode, byPrefix };
 };
 
-export const buildRegionEmojiEvents = (matches: RegionEventMatch[]): DisasterEvent[] => {
-  const events: DisasterEvent[] = [];
-  for (let i = 0; i < matches.length; i += 1) {
-    const { event, match } = matches[i];
-    events.push({ ...event, regionCodes: [match.code.padEnd(10, '0')] });
-  }
-  return events;
-};
-
 export const collectPulseRegionFeatures = (
   pulseRegions: PulseRegion[],
   regionIndex: GeoRegionIndex | null,

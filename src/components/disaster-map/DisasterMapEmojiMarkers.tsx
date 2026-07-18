@@ -2,7 +2,8 @@ import type { Map as MaplibreMap } from 'maplibre-gl';
 import type React from 'react';
 import { getEventKindIcon } from '../../constants';
 import { type DisasterEvent, EventLevels } from '../../types';
-import { normalizeRegionCode, resolveRegionPrefix } from './DisasterMapRegionCodes';
+import { compareEventsByOccurrence } from '../../utils/eventProcessing';
+import type { RegionEventMatch } from './DisasterMapRegions';
 import type { EmojiLabel, EmojiMarker, GeoRegionFeature, GeoRegionIndex } from './DisasterMapTypes';
 
 type RegionKindSummary = {
@@ -78,17 +79,19 @@ const MARKER_VARIANTS: Record<EmojiMarkerVariant, MarkerVariantStyle> = {
   },
 };
 
+const createRegionKindSummary = (): RegionKindSummary => ({
+  kindLevels: new Map(),
+  level: EventLevels.Info,
+  events: [],
+  eventIds: new Set(),
+});
+
 const ensureRegionKindSummary = (target: Map<string, RegionKindSummary>, code: string): RegionKindSummary => {
   const existing = target.get(code);
   if (existing) {
     return existing;
   }
-  const created: RegionKindSummary = {
-    kindLevels: new Map(),
-    level: EventLevels.Info,
-    events: [],
-    eventIds: new Set(),
-  };
+  const created = createRegionKindSummary();
   target.set(code, created);
   return created;
 };
@@ -111,6 +114,17 @@ const updateKindLevels = (target: Map<number, EventLevels>, kind: number, level:
 const mergeKindLevels = (target: Map<number, EventLevels>, source: Map<number, EventLevels>) => {
   for (const [kind, level] of source.entries()) {
     updateKindLevels(target, kind, level);
+  }
+};
+
+const mergeRegionKindSummary = (target: RegionKindSummary, source: RegionKindSummary | undefined) => {
+  if (!source) {
+    return;
+  }
+  target.level = Math.max(target.level, source.level);
+  mergeKindLevels(target.kindLevels, source.kindLevels);
+  for (let i = 0; i < source.events.length; i += 1) {
+    appendRegionEvent(target, source.events[i]);
   }
 };
 
@@ -147,6 +161,7 @@ const buildEmojiTokens = (kindLevels: Map<number, EventLevels>, limit: number): 
 };
 
 export const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] => {
+  const seenEventIds = new Set<string>();
   const clusters = new Map<
     string,
     {
@@ -160,9 +175,11 @@ export const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] =
   >();
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i];
-    if (!event.geo) {
+    if (!event.geo || seenEventIds.has(event.id)) {
       continue;
     }
+    seenEventIds.add(event.id);
+
     const keyLng = Math.round(event.geo.lng * POINT_CLUSTER_PRECISION);
     const keyLat = Math.round(event.geo.lat * POINT_CLUSTER_PRECISION);
     const key = `${keyLng}:${keyLat}`;
@@ -205,28 +222,18 @@ export const collectPointEmojiLabels = (events: DisasterEvent[]): EmojiLabel[] =
   return labels;
 };
 
-const collectRegionKindSummaries = (events: DisasterEvent[]): RegionKindSummaries => {
+const collectRegionKindSummaries = (matches: RegionEventMatch[]): RegionKindSummaries => {
   const codes2 = new Map<string, RegionKindSummary>();
   const codes5 = new Map<string, RegionKindSummary>();
-  for (let i = 0; i < events.length; i += 1) {
-    const event = events[i];
-    if (!event.regionCodes || event.geo) {
-      continue;
+  for (let i = 0; i < matches.length; i += 1) {
+    const { event, match } = matches[i];
+    const target = match.isWide ? codes2 : codes5;
+    const summary = ensureRegionKindSummary(target, match.code);
+    if (event.level > summary.level) {
+      summary.level = event.level;
     }
-    for (let j = 0; j < event.regionCodes.length; j += 1) {
-      const normalized = normalizeRegionCode(event.regionCodes[j]);
-      if (!normalized) {
-        continue;
-      }
-      const prefix = resolveRegionPrefix(normalized);
-      const target = prefix.length === 2 ? codes2 : codes5;
-      const summary = ensureRegionKindSummary(target, prefix);
-      if (event.level > summary.level) {
-        summary.level = event.level;
-      }
-      updateKindLevels(summary.kindLevels, event.kind, event.level);
-      appendRegionEvent(summary, event);
-    }
+    updateKindLevels(summary.kindLevels, event.kind, event.level);
+    appendRegionEvent(summary, event);
   }
   return { codes2, codes5 };
 };
@@ -330,13 +337,13 @@ export const buildRegionCentroids = (regionIndex: GeoRegionIndex | null): Region
 };
 
 export const buildRegionEmojiLabels = (
-  events: DisasterEvent[],
+  matches: RegionEventMatch[],
   centroids: RegionCentroidIndex | null,
 ): EmojiLabel[] => {
   if (!centroids) {
     return [];
   }
-  const summaries = collectRegionKindSummaries(events);
+  const summaries = collectRegionKindSummaries(matches);
   const labels: EmojiLabel[] = [];
   for (const [code, position] of centroids.byCode.entries()) {
     const summary5 = summaries.codes5.get(code);
@@ -344,47 +351,22 @@ export const buildRegionEmojiLabels = (
     if (!summary5 && !summary2) {
       continue;
     }
-    const mergedKindLevels = new Map<number, EventLevels>();
-    let level = EventLevels.Info;
-    if (summary5) {
-      level = Math.max(level, summary5.level);
-      mergeKindLevels(mergedKindLevels, summary5.kindLevels);
-    }
-    if (summary2) {
-      level = Math.max(level, summary2.level);
-      mergeKindLevels(mergedKindLevels, summary2.kindLevels);
-    }
-    const mergedEventIds = new Set<string>();
-    if (summary5) {
-      for (let i = 0; i < summary5.events.length; i += 1) {
-        mergedEventIds.add(summary5.events[i].id);
-      }
-    }
-    if (summary2) {
-      for (let i = 0; i < summary2.events.length; i += 1) {
-        mergedEventIds.add(summary2.events[i].id);
-      }
-    }
-    const mergedEvents: DisasterEvent[] = [];
-    if (mergedEventIds.size > 0) {
-      for (let i = 0; i < events.length; i += 1) {
-        const event = events[i];
-        if (mergedEventIds.has(event.id)) {
-          mergedEvents.push(event);
-        }
-      }
-    }
-    const tokens = buildEmojiTokens(mergedKindLevels, MAX_EMOJI_PER_LABEL);
+    const mergedSummary = createRegionKindSummary();
+    mergeRegionKindSummary(mergedSummary, summary5);
+    mergeRegionKindSummary(mergedSummary, summary2);
+    mergedSummary.events.sort(compareEventsByOccurrence);
+
+    const tokens = buildEmojiTokens(mergedSummary.kindLevels, MAX_EMOJI_PER_LABEL);
     if (tokens.length === 0) {
       continue;
     }
     labels.push({
       id: `region-${code}`,
       position,
-      level,
+      level: mergedSummary.level,
       tokens,
-      size: EMOJI_SIZES[level] ?? 12,
-      events: mergedEvents,
+      size: EMOJI_SIZES[mergedSummary.level] ?? 12,
+      events: mergedSummary.events,
     });
   }
   return labels;
