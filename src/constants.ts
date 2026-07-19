@@ -159,7 +159,6 @@ export const STATUS_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.YnaNews]: '뉴스',
   [EventSources.KasaSpaceWeatherWarning]: '우주환경',
   [EventSources.KasaSpaceWeatherCrisisAlert]: '전파경보',
-  [EventSources.OpenSkyEmergencySquawk]: 'Squawk',
 };
 
 export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
@@ -186,7 +185,6 @@ export const EVENT_SOURCE_LABELS: Record<EventSources, string> = {
   [EventSources.YnaNews]: '연합뉴스',
   [EventSources.KasaSpaceWeatherWarning]: '우주청',
   [EventSources.KasaSpaceWeatherCrisisAlert]: '우주청',
-  [EventSources.OpenSkyEmergencySquawk]: 'OpenSky',
 };
 
 export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
@@ -215,7 +213,6 @@ export const EVENT_SOURCE_LINKS: Partial<Record<EventSources, string>> = {
     'https://spaceweather.kasa.go.kr/openpotal/datasetInfo/openApiInfo.do?apiCd=API01',
   [EventSources.KasaSpaceWeatherCrisisAlert]: 'https://spaceweather.kasa.go.kr/Alarm.do',
   [EventSources.YnaNews]: 'https://www.yna.co.kr/',
-  [EventSources.OpenSkyEmergencySquawk]: 'https://map.opensky-network.org/',
 };
 
 export const getEventSourceLink = (sourceId: number): string | null =>
@@ -245,7 +242,6 @@ export const SOURCE_DISPLAY_ORDER: EventSources[] = [
   EventSources.KasaSpaceWeatherWarning,
   EventSources.KasaSpaceWeatherCrisisAlert,
   EventSources.YnaNews,
-  EventSources.OpenSkyEmergencySquawk,
 ];
 
 export const CATEGORY_PAGE_SIZE = 6;

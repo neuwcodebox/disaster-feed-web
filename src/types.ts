@@ -75,7 +75,6 @@ export enum EventSources {
   KmaOverseasEarthquake = 21,
   KmaAwsObservation = 22,
   KdcaPressRelease = 23,
-  OpenSkyEmergencySquawk = 24,
 }
 
 export type EventGeo = {
